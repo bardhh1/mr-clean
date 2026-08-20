@@ -49,8 +49,8 @@ export default {
         sm: "calc(var(--radius) - 4px)"
       },
       boxShadow: {
-        soft: "0 18px 44px -30px rgba(8, 38, 54, 0.55)",
-        lift: "0 24px 70px -42px rgba(8, 38, 54, 0.55)"
+        soft: "0 12px 36px -28px rgba(7, 31, 44, 0.42)",
+        lift: "0 22px 54px -34px rgba(7, 31, 44, 0.5)"
       }
     }
   },

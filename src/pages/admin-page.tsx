@@ -202,7 +202,7 @@ export function AdminPage() {
 
   if (!hasSupabaseConfig) {
     return (
-      <section className="container py-10">
+      <section className="page-shell min-h-[64dvh]">
         <EmptyState
           icon={ShieldAlert}
           title="Admin kërkon Supabase"
@@ -213,16 +213,21 @@ export function AdminPage() {
   }
 
   if (loading) {
-    return <section className="container py-10"><div className="surface h-96 animate-pulse bg-muted" /></section>;
+    return <section className="page-shell min-h-[64dvh]"><div className="surface h-96 animate-pulse bg-muted" /></section>;
   }
 
   if (!authenticated) {
     return (
-      <section className="container flex min-h-[calc(100dvh-8rem)] items-center justify-center py-10">
-        <Card className="w-full max-w-md">
+      <section className="brand-ink flex min-h-[calc(100dvh-7rem)] items-center justify-center px-4 py-12">
+        <Card className="w-full max-w-md border-white/10 shadow-lift">
           <CardHeader>
-            <CardTitle>Kyçu në admin</CardTitle>
-            <CardDescription>Menaxho produktet, kategoritë dhe kërkesat e klientëve.</CardDescription>
+            <img
+              src="/brand/mr-clean-logo.png"
+              alt="Mr. Clean"
+              className="mb-5 h-12 w-auto self-start object-contain"
+            />
+            <CardTitle className="text-2xl">Kyçu në administratë</CardTitle>
+            <CardDescription>Menaxho katalogun, porositë dhe kërkesat e klientëve.</CardDescription>
           </CardHeader>
           <CardContent>
             <form className="grid gap-4" onSubmit={loginForm.handleSubmit(onLogin)}>
@@ -233,7 +238,7 @@ export function AdminPage() {
                 <Input type="password" autoComplete="current-password" {...loginForm.register("password")} />
               </Field>
               {error ? <p role="alert" className="text-sm font-medium text-destructive">{error}</p> : null}
-              <Button type="submit">Kyçu</Button>
+              <Button type="submit" size="lg" className="mt-2 w-full">Kyçu</Button>
             </form>
           </CardContent>
         </Card>
@@ -242,11 +247,12 @@ export function AdminPage() {
   }
 
   return (
-    <section className="container py-10">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+    <section className="page-shell min-h-[70dvh]">
+      <div className="flex flex-col justify-between gap-5 border-b pb-7 md:flex-row md:items-end">
         <div>
-          <p className="text-sm font-semibold text-primary">Paneli Mr. Clean</p>
-          <h1 className="mt-2 text-3xl font-bold">Admin dashboard</h1>
+          <p className="hairline-label">Paneli Mr. Clean</p>
+          <h1 className="mt-4 text-4xl font-extrabold md:text-5xl">Administrata</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Katalogu, porositë dhe ofertat në një pamje.</p>
         </div>
         <Button variant="outline" onClick={logout}>
           <LogOut className="h-4 w-4" aria-hidden="true" />
@@ -266,21 +272,25 @@ export function AdminPage() {
         </div>
       ) : null}
 
-      <div className="mt-7 grid gap-4 md:grid-cols-4">
+      <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {summary.map((item) => (
-          <Card key={item.label}>
-            <CardContent className="p-5">
-              <item.icon className="h-5 w-5 text-primary" aria-hidden="true" />
-              <p className="mt-3 text-3xl font-bold">{item.value}</p>
-              <p className="text-sm text-muted-foreground">{item.label}</p>
+          <Card key={item.label} className="border-t-2 border-t-primary shadow-none">
+            <CardContent className="flex items-end justify-between p-5">
+              <div>
+                <p className="text-3xl font-extrabold tabular-nums">{item.value}</p>
+                <p className="mt-1 text-sm font-medium text-muted-foreground">{item.label}</p>
+              </div>
+              <span className="flex h-10 w-10 items-center justify-center rounded-md bg-secondary text-primary">
+                <item.icon className="h-5 w-5" aria-hidden="true" />
+              </span>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      <div className="mt-7 grid gap-6 xl:grid-cols-[380px_1fr]">
+      <div className="mt-8 grid gap-6 xl:grid-cols-[380px_1fr] xl:items-start">
         <div className="grid gap-6">
-          <Card>
+          <Card className="shadow-none">
             <CardHeader>
               <CardTitle>Kategori e re</CardTitle>
               <CardDescription>Shto kategori për filtrat e katalogut.</CardDescription>
@@ -301,7 +311,7 @@ export function AdminPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="shadow-none">
             <CardHeader>
               <CardTitle>Produkt i ri</CardTitle>
               <CardDescription>Çmimi ruhet në centë, p.sh. 8.90 EUR = 890.</CardDescription>
@@ -354,7 +364,7 @@ export function AdminPage() {
         </div>
 
         <div className="grid gap-6">
-          <Card>
+          <Card className="shadow-none">
             <CardHeader>
               <CardTitle>Produktet</CardTitle>
               <CardDescription>Aktivizo ose fshih produktet nga katalogu publik.</CardDescription>
@@ -362,31 +372,31 @@ export function AdminPage() {
             <CardContent>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[680px] text-left text-sm">
-                  <thead className="border-b text-muted-foreground">
+                  <thead className="border-b bg-muted/60 text-muted-foreground">
                     <tr>
-                      <th className="py-3 pr-4 font-medium">Produkti</th>
-                      <th className="py-3 pr-4 font-medium">Çmimi</th>
-                      <th className="py-3 pr-4 font-medium">Statusi</th>
-                      <th className="py-3 pr-4 font-medium">Tipi</th>
-                      <th className="py-3 pr-4 font-medium">Veprim</th>
+                      <th className="px-3 py-3 font-semibold">Produkti</th>
+                      <th className="px-3 py-3 font-semibold">Çmimi</th>
+                      <th className="px-3 py-3 font-semibold">Statusi</th>
+                      <th className="px-3 py-3 font-semibold">Tipi</th>
+                      <th className="px-3 py-3 font-semibold">Veprim</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
                     {products.map((product) => (
                       <tr key={product.id}>
-                        <td className="py-3 pr-4 font-medium">{product.name}</td>
-                        <td className="py-3 pr-4">
+                        <td className="px-3 py-4 font-semibold">{product.name}</td>
+                        <td className="px-3 py-4 tabular-nums">
                           {product.requires_quote ? "Me ofertë" : formatCurrency(product.price_cents)}
                         </td>
-                        <td className="py-3 pr-4">
+                        <td className="px-3 py-4">
                           <Badge variant={product.is_active ? "secondary" : "outline"}>
                             {product.is_active ? "Aktiv" : "Fshehur"}
                           </Badge>
                         </td>
-                        <td className="py-3 pr-4">
+                        <td className="px-3 py-4">
                           {product.requires_quote ? "Ofertë" : product.is_featured ? "Featured" : "Standard"}
                         </td>
-                        <td className="py-3 pr-4">
+                        <td className="px-3 py-4">
                           <Button size="sm" variant="outline" onClick={() => toggleProduct(product)}>
                             {product.is_active ? "Fshih" : "Aktivizo"}
                           </Button>
@@ -429,7 +439,7 @@ function LeadTable({
   rows: Array<{ id: string; title: string; meta: string; status: string }>;
 }) {
   return (
-    <Card>
+    <Card className="shadow-none">
       <CardHeader>
         <CardTitle>{title}</CardTitle>
       </CardHeader>
@@ -439,7 +449,7 @@ function LeadTable({
         ) : (
           <div className="grid gap-3">
             {rows.map((row) => (
-              <div key={row.id} className="rounded-md border bg-background p-3">
+              <div key={row.id} className="border-b py-3 last:border-b-0">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-medium">{row.title}</p>

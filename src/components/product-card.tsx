@@ -1,6 +1,5 @@
-import { MessageCircle, Plus } from "lucide-react";
+import { ArrowUpRight, MessageCircle, Plus } from "lucide-react";
 import { Link } from "react-router-dom";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/context/cart-context";
 import { formatCurrency } from "@/lib/format";
@@ -11,49 +10,59 @@ export function ProductCard({ product }: { product: Product }) {
   const image = product.image_urls[0];
 
   return (
-    <article className="group overflow-hidden rounded-lg border bg-white shadow-soft transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lift">
-      <Link to={`/produkte/${product.slug}`} className="block">
-        <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
+    <article className="group flex min-h-full flex-col overflow-hidden rounded-lg border bg-white transition-[border-color,box-shadow] duration-200 hover:border-primary/45 hover:shadow-lift">
+      <Link to={`/produkte/${product.slug}`} className="relative block overflow-hidden bg-muted">
+        <div className="aspect-[4/3] overflow-hidden">
           <img
             src={image}
             alt={product.name}
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+            width={640}
+            height={480}
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.025]"
             loading="lazy"
           />
-          <div className="absolute left-3 top-3">
-            <Badge variant={product.requires_quote ? "secondary" : "outline"} className="bg-white/90 backdrop-blur">
-              {product.stock_label}
-            </Badge>
-          </div>
+        </div>
+        <div className="absolute inset-x-3 top-3 flex items-start justify-between gap-2">
+          <span className="rounded-md border border-white/40 bg-white/[0.92] px-2.5 py-1 text-xs font-bold text-foreground shadow-sm backdrop-blur-sm">
+            {product.stock_label}
+          </span>
+          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-white/[0.92] text-foreground opacity-0 shadow-sm transition-opacity group-hover:opacity-100">
+            <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+          </span>
         </div>
       </Link>
-      <div className="flex min-h-[238px] flex-col p-4">
-        <div>
-          <Link to={`/produkte/${product.slug}`}>
-            <h3 className="line-clamp-2 text-base font-black leading-6 text-slate-950 transition-colors hover:text-primary">
-              {product.name}
-            </h3>
-          </Link>
-          <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-600">{product.description}</p>
-        </div>
-        <div className="mt-auto flex items-end justify-between gap-3 border-t pt-4">
-          <div>
-            <p className="text-xl font-black text-slate-950">
-              {product.requires_quote ? "Me ofertë" : formatCurrency(product.price_cents)}
+
+      <div className="flex flex-1 flex-col p-4 md:p-5">
+        <Link to={`/produkte/${product.slug}`}>
+          <h3 className="line-clamp-2 text-base font-bold leading-6 text-foreground transition-colors hover:text-primary">
+            {product.name}
+          </h3>
+        </Link>
+        <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">
+          {product.description}
+        </p>
+
+        <div className="mt-5 flex items-end justify-between gap-3 border-t pt-4">
+          <div className="min-w-0">
+            <p className="price-figure text-xl">
+              {product.requires_quote ? "Sipas ofertës" : formatCurrency(product.price_cents)}
             </p>
-            <p className="text-xs font-semibold text-slate-500">{product.unit}</p>
+            <p className="mt-0.5 truncate text-xs font-medium text-muted-foreground">{product.unit}</p>
           </div>
           {product.requires_quote ? (
-            <Button asChild size="sm" variant="secondary">
+            <Button asChild size="icon" variant="secondary" aria-label="Kërko ofertë">
               <Link to="/oferta/peceta">
                 <MessageCircle className="h-4 w-4" aria-hidden="true" />
-                Ofertë
               </Link>
             </Button>
           ) : (
-            <Button type="button" size="sm" onClick={() => addItem(product)}>
+            <Button
+              type="button"
+              size="icon"
+              aria-label={`Shto ${product.name} në shportë`}
+              onClick={() => addItem(product)}
+            >
               <Plus className="h-4 w-4" aria-hidden="true" />
-              Shto
             </Button>
           )}
         </div>

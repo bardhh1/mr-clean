@@ -4,7 +4,6 @@ import {
   CheckCircle2,
   ClipboardList,
   LogOut,
-  PackagePlus,
   ShieldAlert,
   Tags
 } from "lucide-react";
@@ -22,9 +21,9 @@ import {
 } from "@/lib/admin";
 import { getAdminProducts, getCategories } from "@/lib/catalog";
 import { formatCurrency } from "@/lib/format";
-import { getOrders, getQuotes } from "@/lib/orders";
+import { getOrders } from "@/lib/orders";
 import { hasSupabaseConfig } from "@/lib/supabase";
-import type { Category, OrderRecord, Product, QuoteRecord } from "@/lib/types";
+import type { Category, OrderRecord, Product } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -68,7 +67,6 @@ export function AdminPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<OrderRecord[]>([]);
-  const [quotes, setQuotes] = useState<QuoteRecord[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -91,23 +89,20 @@ export function AdminPage() {
     () => [
       { label: "Produkte", value: products.length, icon: Boxes },
       { label: "Kategori", value: categories.length, icon: Tags },
-      { label: "Porosi", value: orders.length, icon: ClipboardList },
-      { label: "Oferta", value: quotes.length, icon: PackagePlus }
+      { label: "Porosi", value: orders.length, icon: ClipboardList }
     ],
-    [categories.length, orders.length, products.length, quotes.length]
+    [categories.length, orders.length, products.length]
   );
 
   async function refresh() {
-    const [nextCategories, nextProducts, nextOrders, nextQuotes] = await Promise.all([
+    const [nextCategories, nextProducts, nextOrders] = await Promise.all([
       getCategories(),
       getAdminProducts(),
-      getOrders(),
-      getQuotes()
+      getOrders()
     ]);
     setCategories(nextCategories);
     setProducts(nextProducts);
     setOrders(nextOrders);
-    setQuotes(nextQuotes);
   }
 
   useEffect(() => {
@@ -409,18 +404,12 @@ export function AdminPage() {
             </CardContent>
           </Card>
 
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div>
             <LeadTable title="Porositë" empty="Ende nuk ka porosi." rows={orders.map((order) => ({
               id: order.id,
               title: order.customer_name,
               meta: `${order.company_name || "Pa biznes"} · ${formatCurrency(order.total_cents)}`,
               status: order.status
-            }))} />
-            <LeadTable title="Kërkesat për oferta" empty="Ende nuk ka kërkesa." rows={quotes.map((quote) => ({
-              id: quote.id,
-              title: quote.customer_name,
-              meta: `${quote.company_name || "Pa biznes"} · ${quote.quantity} copë`,
-              status: quote.status
             }))} />
           </div>
         </div>

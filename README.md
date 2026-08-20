@@ -1,14 +1,13 @@
 # Mr. Clean
 
-Vite + React + TypeScript e-commerce site for Mr. Clean, a Kosovo business selling sanitary supplies, custom napkins, cleaning chemicals, aromas, air purifiers and hotel/restaurant supplies.
+Vite + React + TypeScript e-commerce site for Mr. Clean, a Kosovo business selling sanitary supplies, paper products, cleaning chemicals, aromas, air purifiers and hotel/restaurant supplies.
 
 ## Features
 
 - Albanian-first public storefront with EUR pricing.
 - Product catalog, category filters, search, detail pages and localStorage cart.
 - Checkout that saves an order in Supabase and opens WhatsApp with a prefilled message.
-- Quote request flow for personalized napkins with optional logo/reference upload.
-- Supabase Auth admin panel for products, categories, images, orders and quote leads.
+- Supabase Auth admin panel for products, categories, images and orders.
 - Demo catalog fallback, so the site runs before Supabase credentials are added.
 
 ## Setup
@@ -36,8 +35,7 @@ Run `supabase/schema.sql` in the Supabase SQL editor. It creates:
 - `products`
 - `orders`
 - `order_items`
-- `quote_requests`
-- `product-images` and `quote-uploads` storage buckets
+- `product-images` storage bucket
 - RLS policies
 - `create_order_from_cart` RPC for server-side price recalculation
 

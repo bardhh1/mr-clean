@@ -5,7 +5,7 @@ export const demoCategories: Category[] = [
     id: "cat-napkins",
     name: "Peceta dhe letër",
     slug: "peceta-leter",
-    description: "Peceta tavoline, letër kuzhine, letër higjienike dhe opsione të personalizuara.",
+    description: "Peceta tavoline, letër kuzhine dhe letër higjienike për përdorim profesional.",
     sort_order: 1,
     is_active: true
   },
@@ -36,24 +36,6 @@ export const demoCategories: Category[] = [
 ];
 
 export const demoProducts: Product[] = [
-  {
-    id: "prod-custom-napkins",
-    category_id: "cat-napkins",
-    name: "Peceta të personalizuara",
-    slug: "peceta-te-personalizuara",
-    description:
-      "Peceta për restorante dhe kafiteri me logo, tekst ose dizajn sipas kërkesës së klientit.",
-    price_cents: 0,
-    currency: "EUR",
-    unit: "me ofertë",
-    image_urls: [
-      "https://images.unsplash.com/photo-1551218808-94e220e084d2?auto=format&fit=crop&w=1200&q=80"
-    ],
-    is_active: true,
-    is_featured: true,
-    requires_quote: true,
-    stock_label: "Me porosi"
-  },
   {
     id: "prod-napkin-white",
     category_id: "cat-napkins",

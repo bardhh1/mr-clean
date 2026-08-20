@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useCart } from "@/context/cart-context";
 import { formatCurrency } from "@/lib/format";
 import type { Product } from "@/lib/types";
+import { buildWhatsAppUrl } from "@/lib/whatsapp";
 
 export function ProductCard({ product }: { product: Product }) {
   const { addItem } = useCart();
@@ -51,9 +52,13 @@ export function ProductCard({ product }: { product: Product }) {
           </div>
           {product.requires_quote ? (
             <Button asChild size="icon" variant="secondary" aria-label="Kërko ofertë">
-              <Link to="/oferta/peceta">
+              <a
+                href={buildWhatsAppUrl(`Përshëndetje Mr. Clean, dua ofertë për ${product.name}.`)}
+                target="_blank"
+                rel="noreferrer"
+              >
                 <MessageCircle className="h-4 w-4" aria-hidden="true" />
-              </Link>
+              </a>
             </Button>
           ) : (
             <Button

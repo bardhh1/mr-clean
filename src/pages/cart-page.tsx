@@ -14,7 +14,7 @@ export function CartPage() {
         <EmptyState
           icon={ShoppingBag}
           title="Shporta është bosh"
-          description="Shto produkte standarde në shportë ose kërko ofertë për peceta të personalizuara."
+          description="Shfleto katalogun dhe shto produktet që i duhen biznesit tënd."
           action={<Button asChild><Link to="/produkte">Shiko produktet</Link></Button>}
         />
       </section>

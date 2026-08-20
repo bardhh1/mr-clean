@@ -17,6 +17,7 @@ import { useCart } from "@/context/cart-context";
 import { getProductBySlug, getProducts } from "@/lib/catalog";
 import { formatCurrency } from "@/lib/format";
 import type { Product } from "@/lib/types";
+import { buildWhatsAppUrl } from "@/lib/whatsapp";
 
 const assurances = [
   { icon: PackageCheck, text: "Porosi e konfirmuar direkt nga ekipi ynë" },
@@ -123,10 +124,14 @@ export function ProductPage() {
 
             {product.requires_quote ? (
               <Button asChild size="lg" className="mt-6 w-full sm:w-auto">
-                <Link to="/oferta/peceta">
+                <a
+                  href={buildWhatsAppUrl(`Përshëndetje Mr. Clean, dua ofertë për ${product.name}.`)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   <MessageCircle className="h-5 w-5" aria-hidden="true" />
-                  Kërko ofertë të personalizuar
-                </Link>
+                  Kontakto për ofertë
+                </a>
               </Button>
             ) : (
               <div className="mt-6 flex flex-col gap-3 sm:flex-row">

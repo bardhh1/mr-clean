@@ -8,8 +8,7 @@ import { buildWhatsAppUrl } from "@/lib/whatsapp";
 
 const navItems = [
   { href: "/", label: "Ballina", end: true },
-  { href: "/produkte", label: "Produktet" },
-  { href: "/oferta/peceta", label: "Peceta me logo" }
+  { href: "/produkte", label: "Produktet" }
 ];
 
 export function Layout() {
@@ -158,15 +157,14 @@ export function Layout() {
                 className="h-14 w-auto rounded-md bg-white px-3 py-2"
               />
               <p className="mt-5 max-w-md text-sm leading-7 text-white/[0.66]">
-                Produkte sanitare, kimikate pastrimi, aroma dhe zgjidhje të personalizuara për
-                biznese që duan standard të lartë çdo ditë.
+                Produkte sanitare, kimikate pastrimi dhe aroma për biznese që duan standard të
+                lartë çdo ditë.
               </p>
             </div>
             <div>
               <p className="text-sm font-bold text-white">Navigimi</p>
               <div className="mt-4 grid gap-3 text-sm text-white/[0.66]">
                 <Link className="hover:text-white" to="/produkte">Produktet</Link>
-                <Link className="hover:text-white" to="/oferta/peceta">Peceta me logo</Link>
                 <Link className="hover:text-white" to="/shporta">Shporta</Link>
               </div>
             </div>

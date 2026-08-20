@@ -8,7 +8,6 @@ const CatalogPage = lazy(() => import("@/pages/catalog-page").then((module) => (
 const CheckoutPage = lazy(() => import("@/pages/checkout-page").then((module) => ({ default: module.CheckoutPage })));
 const HomePage = lazy(() => import("@/pages/home-page").then((module) => ({ default: module.HomePage })));
 const ProductPage = lazy(() => import("@/pages/product-page").then((module) => ({ default: module.ProductPage })));
-const QuotePage = lazy(() => import("@/pages/quote-page").then((module) => ({ default: module.QuotePage })));
 
 export function App() {
   return (
@@ -20,7 +19,6 @@ export function App() {
           <Route path="/produkte/:slug" element={<ProductPage />} />
           <Route path="/shporta" element={<CartPage />} />
           <Route path="/checkout" element={<CheckoutPage />} />
-          <Route path="/oferta/peceta" element={<QuotePage />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

@@ -1,6 +1,6 @@
 import { orderReference } from "@/lib/format";
 import { supabase } from "@/lib/supabase";
-import type { CartItem, CheckoutInput, OrderRecord, QuoteInput, QuoteRecord } from "@/lib/types";
+import type { CartItem, CheckoutInput, OrderRecord } from "@/lib/types";
 
 export async function submitOrder(values: CheckoutInput, items: CartItem[]) {
   const total = items.reduce((sum, item) => sum + item.product.price_cents * item.quantity, 0);
@@ -54,50 +54,6 @@ export async function submitOrder(values: CheckoutInput, items: CartItem[]) {
   return order as OrderRecord;
 }
 
-export async function submitQuote(values: QuoteInput) {
-  let logoUrl: string | null = null;
-  const file = values.logo_file?.item(0);
-
-  if (supabase && file) {
-    const path = `${Date.now()}-${file.name}`;
-    const { error: uploadError } = await supabase.storage.from("quote-uploads").upload(path, file);
-    if (uploadError) throw uploadError;
-
-    const { data } = supabase.storage.from("quote-uploads").getPublicUrl(path);
-    logoUrl = data.publicUrl;
-  }
-
-  if (!supabase) {
-    return {
-      id: orderReference("Q"),
-      customer_name: values.customer_name,
-      company_name: values.company_name || null,
-      phone: values.phone,
-      quantity: values.quantity,
-      notes: values.notes,
-      logo_file_url: logoUrl,
-      status: "new" as const
-    };
-  }
-
-  const { data, error } = await supabase
-    .from("quote_requests")
-    .insert({
-      customer_name: values.customer_name,
-      company_name: values.company_name || null,
-      phone: values.phone,
-      quantity: values.quantity,
-      notes: values.notes,
-      logo_file_url: logoUrl,
-      status: "new"
-    })
-    .select("*")
-    .single();
-
-  if (error) throw error;
-  return data as QuoteRecord;
-}
-
 export async function getOrders() {
   if (!supabase) return [] as OrderRecord[];
   const { data, error } = await supabase
@@ -106,14 +62,4 @@ export async function getOrders() {
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as OrderRecord[];
-}
-
-export async function getQuotes() {
-  if (!supabase) return [] as QuoteRecord[];
-  const { data, error } = await supabase
-    .from("quote_requests")
-    .select("*")
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return (data ?? []) as QuoteRecord[];
 }

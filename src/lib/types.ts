@@ -38,31 +38,10 @@ export type CheckoutInput = {
   payment_preference: "cash" | "bank_transfer";
 };
 
-export type QuoteInput = {
-  customer_name: string;
-  company_name?: string;
-  phone: string;
-  quantity: number;
-  notes: string;
-  logo_file?: FileList;
-};
-
 export type OrderRecord = CheckoutInput & {
   id: string;
   total_cents: number;
   currency: "EUR";
   status: "pending_whatsapp" | "confirmed" | "completed" | "cancelled";
-  created_at?: string;
-};
-
-export type QuoteRecord = {
-  id: string;
-  customer_name: string;
-  company_name: string | null;
-  phone: string;
-  quantity: number;
-  notes: string;
-  logo_file_url: string | null;
-  status: "new" | "contacted" | "quoted" | "closed";
   created_at?: string;
 };

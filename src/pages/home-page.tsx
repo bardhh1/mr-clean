@@ -4,7 +4,6 @@ import {
   Check,
   Droplets,
   Hotel,
-  MessageCircle,
   PackageCheck,
   ScrollText,
   SprayCan
@@ -75,14 +74,6 @@ export function HomePage() {
                   Shfleto produktet
                   <ArrowRight className="h-5 w-5" aria-hidden="true" />
                 </Link>
-              </Button>
-              <Button
-                asChild
-                size="lg"
-                variant="outline"
-                className="border-white/30 bg-white/5 text-white hover:border-white hover:bg-white hover:text-foreground"
-              >
-                <Link to="/oferta/peceta">Kërko peceta me logo</Link>
               </Button>
             </div>
 
@@ -158,37 +149,6 @@ export function HomePage() {
             {featured.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="relative min-h-[560px] overflow-hidden brand-ink">
-        <img
-          src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=2000&q=88"
-          alt="Restorant i përgatitur me tavolina dhe peceta"
-          className="absolute inset-0 h-full w-full object-cover"
-          loading="lazy"
-        />
-        <div className="absolute inset-0 bg-[#061c28]/82" />
-        <div className="section-shell relative flex min-h-[560px] items-center">
-          <div className="max-w-2xl">
-            <p className="flex items-center gap-3 text-xs font-bold uppercase text-cyan-300">
-              <span className="h-px w-10 bg-cyan-300" />
-              Personalizim për HoReCa
-            </p>
-            <h2 className="mt-5 text-4xl font-extrabold leading-[1.02] text-white md:text-6xl">
-              Peceta që mbajnë emrin tuaj.
-            </h2>
-            <p className="mt-5 max-w-xl text-lg leading-8 text-white/70">
-              Dërgo logon, sasinë dhe formatin. Ne përgatisim ofertën sipas identitetit dhe
-              ritmit të biznesit tënd.
-            </p>
-            <Button asChild size="lg" className="mt-8 bg-cyan-400 text-[#061c28] hover:bg-cyan-300">
-              <Link to="/oferta/peceta">
-                <MessageCircle className="h-5 w-5" aria-hidden="true" />
-                Fillo kërkesën
-              </Link>
-            </Button>
           </div>
         </div>
       </section>

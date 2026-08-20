@@ -53,23 +53,10 @@ create table if not exists public.order_items (
   created_at timestamptz not null default now()
 );
 
-create table if not exists public.quote_requests (
-  id uuid primary key default gen_random_uuid(),
-  customer_name text not null,
-  company_name text,
-  phone text not null,
-  quantity integer not null check (quantity > 0),
-  notes text not null,
-  logo_file_url text,
-  status text not null default 'new',
-  created_at timestamptz not null default now()
-);
-
 alter table public.categories enable row level security;
 alter table public.products enable row level security;
 alter table public.orders enable row level security;
 alter table public.order_items enable row level security;
-alter table public.quote_requests enable row level security;
 
 drop policy if exists "Public active categories" on public.categories;
 create policy "Public active categories"
@@ -113,38 +100,19 @@ create policy "Authenticated order item reads"
   on public.order_items for select
   using (auth.role() = 'authenticated');
 
-drop policy if exists "Public quote inserts" on public.quote_requests;
-create policy "Public quote inserts"
-  on public.quote_requests for insert
-  with check (true);
-
-drop policy if exists "Authenticated quote reads" on public.quote_requests;
-create policy "Authenticated quote reads"
-  on public.quote_requests for select
-  using (auth.role() = 'authenticated');
-
 insert into storage.buckets (id, name, public)
 values ('product-images', 'product-images', true)
-on conflict (id) do nothing;
-
-insert into storage.buckets (id, name, public)
-values ('quote-uploads', 'quote-uploads', true)
 on conflict (id) do nothing;
 
 drop policy if exists "Public product image reads" on storage.objects;
 create policy "Public product image reads"
   on storage.objects for select
-  using (bucket_id in ('product-images', 'quote-uploads'));
+  using (bucket_id = 'product-images');
 
 drop policy if exists "Authenticated product image writes" on storage.objects;
 create policy "Authenticated product image writes"
   on storage.objects for insert
   with check (bucket_id = 'product-images' and auth.role() = 'authenticated');
-
-drop policy if exists "Public quote upload writes" on storage.objects;
-create policy "Public quote upload writes"
-  on storage.objects for insert
-  with check (bucket_id = 'quote-uploads');
 
 create or replace function public.create_order_from_cart(
   "order" jsonb,

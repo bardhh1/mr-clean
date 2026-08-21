@@ -7,8 +7,10 @@ import { ApiExceptionFilter } from "./common/filters/api-exception.filter";
 import { RequestIdInterceptor } from "./common/interceptors/request-id.interceptor";
 import { validateEnvironment } from "./config/env.validation";
 import { CatalogModule } from "./catalog/catalog.module";
+import { AdminModule } from "./admin/admin.module";
 import { databaseOptions } from "./database/database.config";
 import { HealthModule } from "./health/health.module";
+import { StorageModule } from "./storage/storage.module";
 
 @Module({
   imports: [
@@ -27,8 +29,10 @@ import { HealthModule } from "./health/health.module";
       inject: [ConfigService],
       useFactory: databaseOptions
     }),
+    StorageModule,
     HealthModule,
-    CatalogModule
+    CatalogModule,
+    AdminModule
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

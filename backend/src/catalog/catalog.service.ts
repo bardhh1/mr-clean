@@ -4,6 +4,7 @@ import { Repository } from "typeorm";
 import { CatalogQueryDto } from "./dto/catalog-query.dto";
 import { CategoryEntity } from "./entities/category.entity";
 import { ProductEntity } from "./entities/product.entity";
+import { StorageService } from "../storage/storage.service";
 
 @Injectable()
 export class CatalogService {
@@ -11,7 +12,8 @@ export class CatalogService {
     @InjectRepository(CategoryEntity)
     private readonly categories: Repository<CategoryEntity>,
     @InjectRepository(ProductEntity)
-    private readonly products: Repository<ProductEntity>
+    private readonly products: Repository<ProductEntity>,
+    private readonly storage: StorageService
   ) {}
 
   listCategories(): Promise<CategoryEntity[]> {
@@ -62,7 +64,8 @@ export class CatalogService {
       .skip(query.offset)
       .take(query.limit);
 
-    const [data, total] = await builder.getManyAndCount();
+    const [products, total] = await builder.getManyAndCount();
+    const data = await Promise.all(products.map((product) => this.toPublicProduct(product)));
     return {
       data,
       meta: {
@@ -74,7 +77,7 @@ export class CatalogService {
     };
   }
 
-  async getProductBySlug(slug: string): Promise<ProductEntity> {
+  async getProductBySlug(slug: string) {
     const product = await this.products
       .createQueryBuilder("product")
       .innerJoinAndSelect("product.category", "category")
@@ -84,6 +87,14 @@ export class CatalogService {
       .getOne();
 
     if (!product) throw new NotFoundException("Product was not found");
-    return product;
+    return this.toPublicProduct(product);
+  }
+
+  private async toPublicProduct(product: ProductEntity) {
+    const { image_keys, ...publicFields } = product;
+    return {
+      ...publicFields,
+      image_urls: await this.storage.resolveProductImages(product.image_urls, image_keys)
+    };
   }
 }

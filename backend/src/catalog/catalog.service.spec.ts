@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { CatalogService } from "./catalog.service";
 import { CategoryEntity } from "./entities/category.entity";
 import { ProductEntity } from "./entities/product.entity";
+import type { StorageService } from "../storage/storage.service";
 
 function queryBuilderMock() {
   const builder = {
@@ -25,13 +26,17 @@ function queryBuilderMock() {
 }
 
 describe("CatalogService", () => {
+  const storage = {
+    resolveProductImages: vi.fn().mockImplementation((urls: string[]) => Promise.resolve(urls))
+  } as unknown as StorageService;
+
   it("always limits public product results to active products and categories", async () => {
     const builder = queryBuilderMock();
     builder.getManyAndCount.mockResolvedValue([[{ id: "product-1" }], 1]);
     const productRepo = {
       createQueryBuilder: vi.fn().mockReturnValue(builder)
     } as unknown as Repository<ProductEntity>;
-    const service = new CatalogService({} as Repository<CategoryEntity>, productRepo);
+    const service = new CatalogService({} as Repository<CategoryEntity>, productRepo, storage);
 
     const result = await service.listProducts({
       category: "hotelieri",
@@ -59,7 +64,7 @@ describe("CatalogService", () => {
     const productRepo = {
       createQueryBuilder: vi.fn().mockReturnValue(builder)
     } as unknown as Repository<ProductEntity>;
-    const service = new CatalogService({} as Repository<CategoryEntity>, productRepo);
+    const service = new CatalogService({} as Repository<CategoryEntity>, productRepo, storage);
 
     await expect(service.getProductBySlug("hidden-product")).rejects.toMatchObject({
       status: 404

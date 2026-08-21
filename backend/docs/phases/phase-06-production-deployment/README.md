@@ -32,6 +32,21 @@ This matters for two reasons:
 
 The Dockerfile is multi-stage, installs from the lockfile, compiles strict TypeScript, removes development dependencies from the runtime image, and runs as the unprivileged `node` user.
 
+### Railway configuration transition
+
+The final deployment reported that `railway.json` is deprecated and will stop being read on December 1, 2026. The file remains the active, verified deployment contract today.
+
+A dry-run of `railway config migrate --service mr-clean-api` was reviewed before changing production. Railway's current beta Infrastructure as Code generator preserved the start command and health check, but emitted the Dockerfile selection, pre-deploy migration, and monorepo watch pattern only as comments. Applying that incomplete translation would remove release controls that matter more than suppressing a deprecation warning, so the migration was intentionally not applied.
+
+Before the cutoff:
+
+1. Upgrade the Railway CLI and repeat the migration dry-run.
+2. Confirm `.railway/railway.ts` can represent the Dockerfile, migration gate, and source/watch behavior, or persist the unsupported fields explicitly in the service settings.
+3. Run `railway config plan` and reject any unexpected service, database, bucket, volume, or variable deletion.
+4. Apply the migration, deploy a candidate, and repeat every production verification in this document.
+
+This is a dated platform transition, not a current runtime failure. Keeping the verified contract is safer than silently accepting an incomplete beta translation.
+
 ## Production variables
 
 Values are stored in Railway or Vercel and are not committed. The API has validated variables for:

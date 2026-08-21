@@ -10,6 +10,7 @@ import { CatalogModule } from "./catalog/catalog.module";
 import { AdminModule } from "./admin/admin.module";
 import { databaseOptions } from "./database/database.config";
 import { HealthModule } from "./health/health.module";
+import { OrdersModule } from "./orders/orders.module";
 import { StorageModule } from "./storage/storage.module";
 
 @Module({
@@ -32,7 +33,8 @@ import { StorageModule } from "./storage/storage.module";
     StorageModule,
     HealthModule,
     CatalogModule,
-    AdminModule
+    AdminModule,
+    OrdersModule
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

@@ -3,7 +3,7 @@
   "build": {
     "builder": "DOCKERFILE",
     "dockerfilePath": "Dockerfile",
-    "watchPatterns": ["src/**", "package.json", "package-lock.json", "Dockerfile", "railway.json"]
+    "watchPatterns": ["/backend/**"]
   },
   "deploy": {
     "preDeployCommand": ["npm run db:migrate"],

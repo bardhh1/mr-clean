@@ -8,8 +8,14 @@ export function buildWhatsAppUrl(message: string) {
   return `https://wa.me/${phone.replace(/[^\d]/g, "")}?text=${encodeURIComponent(message)}`;
 }
 
-export function buildOrderMessage(orderId: string, values: CheckoutInput, items: CartItem[]) {
-  const total = items.reduce((sum, item) => sum + item.product.price_cents * item.quantity, 0);
+export function buildOrderMessage(
+  orderReference: string,
+  values: CheckoutInput,
+  items: CartItem[],
+  confirmedTotalCents?: number
+) {
+  const total = confirmedTotalCents
+    ?? items.reduce((sum, item) => sum + item.product.price_cents * item.quantity, 0);
   const lines = items.map(
     (item) =>
       `- ${item.product.name} x${item.quantity} (${item.product.unit}) = ${formatCurrency(
@@ -18,7 +24,7 @@ export function buildOrderMessage(orderId: string, values: CheckoutInput, items:
   );
 
   return [
-    `Porosi e re Mr. Clean: ${orderId}`,
+    `Porosi e re Mr. Clean: ${orderReference}`,
     "",
     "Produktet:",
     ...lines,

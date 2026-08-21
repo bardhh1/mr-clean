@@ -47,7 +47,12 @@ export function CheckoutPage() {
     setError(null);
     try {
       const order = await submitOrder(values, items);
-      const message = buildOrderMessage(order.id, values, items);
+      const message = buildOrderMessage(
+        order.reference,
+        values,
+        items,
+        order.total_cents
+      );
       clearCart();
       window.location.assign(buildWhatsAppUrl(message));
     } catch (err) {

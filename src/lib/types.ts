@@ -17,6 +17,7 @@ export type Product = {
   currency: "EUR";
   unit: string;
   image_urls: string[];
+  image_keys?: string[];
   is_active: boolean;
   is_featured: boolean;
   requires_quote: boolean;
@@ -38,10 +39,24 @@ export type CheckoutInput = {
   payment_preference: "cash" | "bank_transfer";
 };
 
-export type OrderRecord = CheckoutInput & {
+export type OrderReceipt = {
   id: string;
+  reference: string;
   total_cents: number;
   currency: "EUR";
   status: "pending_whatsapp" | "confirmed" | "completed" | "cancelled";
   created_at?: string;
+};
+
+export type OrderRecord = CheckoutInput & OrderReceipt & {
+  updated_at?: string;
+  items?: Array<{
+    id: string;
+    product_id: string | null;
+    name: string;
+    unit: string;
+    quantity: number;
+    unit_price_cents: number;
+    line_total_cents: number;
+  }>;
 };

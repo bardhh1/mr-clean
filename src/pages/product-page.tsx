@@ -16,17 +16,27 @@ export function ProductPage() {
   const [related, setRelated] = useState<Product[]>([]);
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { addItem } = useCart();
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       if (!slug) return;
-      const [current, products] = await Promise.all([getProductBySlug(slug), getProducts()]);
-      if (!cancelled) {
-        setProduct(current);
-        setRelated(products.filter((item) => item.id !== current?.id).slice(0, 3));
-        setLoading(false);
+      const productsRequest = getProducts();
+      try {
+        const current = await getProductBySlug(slug);
+        const products = await productsRequest.catch(() => []);
+        if (!cancelled) {
+          setProduct(current);
+          setRelated(products.filter((item) => item.id !== current?.id).slice(0, 3));
+        }
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(loadError instanceof Error ? loadError.message : "Produkti nuk u ngarkua.");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     }
     load();
@@ -41,6 +51,10 @@ export function ProductPage() {
   ]} />;
 
   if (loading) return <PosterFrame rail={rail}><div className="poster-page"><div className="product-detail-skeleton" /></div></PosterFrame>;
+
+  if (error) {
+    return <PosterFrame rail={rail}><div className="poster-page"><EmptyState icon={ShoppingCart} title="Produkti nuk u ngarkua" description={error} /></div></PosterFrame>;
+  }
 
   if (!product) {
     return <PosterFrame rail={rail}><div className="poster-page"><EmptyState icon={ShoppingCart} title="Produkti nuk u gjet" description="Produkti mund të jetë larguar nga katalogu." /></div></PosterFrame>;

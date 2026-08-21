@@ -19,10 +19,10 @@ import {
   upsertCategory,
   upsertProduct
 } from "@/lib/admin";
-import { getAdminProducts, getCategories } from "@/lib/catalog";
+import { getAdminCategories, getAdminProducts } from "@/lib/catalog";
 import { formatCurrency } from "@/lib/format";
-import { getOrders } from "@/lib/orders";
-import { hasSupabaseConfig } from "@/lib/supabase";
+import { getOrders, updateOrderStatus } from "@/lib/orders";
+import { hasApiConfig } from "@/lib/api";
 import type { Category, OrderRecord, Product } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,7 +33,7 @@ import { Select } from "@/components/ui/select";
 
 const loginSchema = z.object({
   email: z.string().email("Email nuk është valid."),
-  password: z.string().min(6, "Fjalëkalimi duhet të ketë së paku 6 karaktere.")
+  password: z.string().min(12, "Fjalëkalimi duhet të ketë së paku 12 karaktere.")
 });
 
 const categorySchema = z.object({
@@ -95,11 +95,7 @@ export function AdminPage() {
   );
 
   async function refresh() {
-    const [nextCategories, nextProducts, nextOrders] = await Promise.all([
-      getCategories(),
-      getAdminProducts(),
-      getOrders()
-    ]);
+    const [nextCategories, nextProducts, nextOrders] = await loadAdminDashboard();
     setCategories(nextCategories);
     setProducts(nextProducts);
     setOrders(nextOrders);
@@ -111,7 +107,14 @@ export function AdminPage() {
       try {
         const user = await getSessionUser();
         if (!cancelled) setAuthenticated(Boolean(user));
-        if (user) await refresh();
+        if (user) {
+          const [nextCategories, nextProducts, nextOrders] = await loadAdminDashboard();
+          if (!cancelled) {
+            setCategories(nextCategories);
+            setProducts(nextProducts);
+            setOrders(nextOrders);
+          }
+        }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : "Admin nuk u ngarkua.");
       } finally {
@@ -153,7 +156,7 @@ export function AdminPage() {
     setError(null);
     try {
       const file = values.image_file?.item?.(0) as File | undefined;
-      const imageUrl = file ? await uploadProductImage(file) : values.image_url;
+      const uploaded = file ? await uploadProductImage(file) : null;
       await upsertProduct({
         name: values.name,
         category_id: values.category_id,
@@ -161,7 +164,8 @@ export function AdminPage() {
         price_cents: values.price_cents,
         unit: values.unit,
         stock_label: values.stock_label,
-        image_urls: imageUrl ? [imageUrl] : [],
+        image_urls: !uploaded && values.image_url ? [values.image_url] : [],
+        image_keys: uploaded ? [uploaded.key] : [],
         is_featured: values.is_featured,
         requires_quote: values.requires_quote,
         is_active: true
@@ -191,17 +195,40 @@ export function AdminPage() {
   }
 
   async function logout() {
-    await signOutAdmin();
-    setAuthenticated(false);
+    setError(null);
+    try {
+      await signOutAdmin();
+      setAuthenticated(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Dalja dështoi.");
+    }
   }
 
-  if (!hasSupabaseConfig) {
+  async function advanceOrder(order: OrderRecord) {
+    const next = order.status === "pending_whatsapp"
+      ? "confirmed"
+      : order.status === "confirmed"
+        ? "completed"
+        : null;
+    if (!next) return;
+
+    setError(null);
+    try {
+      await updateOrderStatus(order.id, next);
+      await refresh();
+      setNotice(next === "confirmed" ? "Porosia u konfirmua." : "Porosia u përfundua.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Statusi i porosisë nuk u ndryshua.");
+    }
+  }
+
+  if (!hasApiConfig) {
     return (
       <section className="page-shell min-h-[64dvh]">
         <EmptyState
           icon={ShieldAlert}
-          title="Admin kërkon Supabase"
-          description="Vendos VITE_SUPABASE_URL dhe VITE_SUPABASE_ANON_KEY në .env për të aktivizuar panelin."
+          title="Admin kërkon API-në"
+          description="Vendos VITE_API_BASE_URL në .env për të lidhur panelin me NestJS dhe Railway."
         />
       </section>
     );
@@ -407,15 +434,29 @@ export function AdminPage() {
           <div>
             <LeadTable title="Porositë" empty="Ende nuk ka porosi." rows={orders.map((order) => ({
               id: order.id,
-              title: order.customer_name,
+              title: `${order.reference} · ${order.customer_name}`,
               meta: `${order.company_name || "Pa biznes"} · ${formatCurrency(order.total_cents)}`,
-              status: order.status
+              status: order.status,
+              actionLabel: order.status === "pending_whatsapp"
+                ? "Konfirmo"
+                : order.status === "confirmed"
+                  ? "Përfundo"
+                  : undefined,
+              onAction: () => advanceOrder(order)
             }))} />
           </div>
         </div>
       </div>
     </section>
   );
+}
+
+function loadAdminDashboard() {
+  return Promise.all([
+    getAdminCategories(),
+    getAdminProducts(),
+    getOrders()
+  ]);
 }
 
 function LeadTable({
@@ -425,7 +466,14 @@ function LeadTable({
 }: {
   title: string;
   empty: string;
-  rows: Array<{ id: string; title: string; meta: string; status: string }>;
+  rows: Array<{
+    id: string;
+    title: string;
+    meta: string;
+    status: string;
+    actionLabel?: string;
+    onAction?: () => void;
+  }>;
 }) {
   return (
     <Card className="shadow-none">
@@ -444,7 +492,14 @@ function LeadTable({
                     <p className="font-medium">{row.title}</p>
                     <p className="mt-1 text-sm text-muted-foreground">{row.meta}</p>
                   </div>
-                  <Badge variant="outline">{row.status}</Badge>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Badge variant="outline">{row.status}</Badge>
+                    {row.actionLabel && row.onAction ? (
+                      <Button size="sm" variant="outline" onClick={row.onAction}>
+                        {row.actionLabel}
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             ))}

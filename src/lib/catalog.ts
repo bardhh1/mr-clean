@@ -1,50 +1,68 @@
 import { demoCategories, demoProducts } from "@/lib/demo-data";
-import { supabase } from "@/lib/supabase";
+import { apiRequest, hasApiConfig } from "@/lib/api";
 import type { Category, Product } from "@/lib/types";
 
+type ProductListResponse = {
+  data: Product[];
+};
+
+let categoriesRequest: Promise<Category[]> | null = null;
+let productsRequest: Promise<Product[]> | null = null;
+let categoriesExpireAt = 0;
+let productsExpireAt = 0;
+const publicCacheLifetimeMs = 10 * 60 * 1_000;
+
 export async function getCategories(): Promise<Category[]> {
-  if (!supabase) return demoCategories;
-
-  const { data, error } = await supabase
-    .from("categories")
-    .select("*")
-    .eq("is_active", true)
-    .order("sort_order", { ascending: true });
-
-  if (error) {
-    console.warn("Falling back to demo categories:", error.message);
-    return demoCategories;
+  if (!hasApiConfig) return demoCategories;
+  if (!categoriesRequest || Date.now() >= categoriesExpireAt) {
+    categoriesExpireAt = Date.now() + publicCacheLifetimeMs;
+    categoriesRequest = apiRequest<Category[]>("/categories").catch((error: unknown) => {
+      categoriesRequest = null;
+      categoriesExpireAt = 0;
+      throw error;
+    });
   }
-
-  return data ?? demoCategories;
+  return categoriesRequest;
 }
 
 export async function getProducts(): Promise<Product[]> {
-  if (!supabase) return demoProducts;
-
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .eq("is_active", true)
-    .order("name", { ascending: true });
-
-  if (error) {
-    console.warn("Falling back to demo products:", error.message);
-    return demoProducts;
+  if (!hasApiConfig) return demoProducts;
+  if (!productsRequest || Date.now() >= productsExpireAt) {
+    productsExpireAt = Date.now() + publicCacheLifetimeMs;
+    productsRequest = apiRequest<ProductListResponse>("/products?limit=100").then(
+      (response) => response.data
+    ).catch((error: unknown) => {
+      productsRequest = null;
+      productsExpireAt = 0;
+      throw error;
+    });
   }
-
-  return data ?? demoProducts;
+  return productsRequest;
 }
 
 export async function getAdminProducts(): Promise<Product[]> {
-  if (!supabase) return demoProducts;
+  return apiRequest<Product[]>("/admin/products");
+}
 
-  const { data, error } = await supabase.from("products").select("*").order("name");
-  if (error) throw error;
-  return data ?? [];
+export async function getAdminCategories(): Promise<Category[]> {
+  return apiRequest<Category[]>("/admin/categories");
 }
 
 export async function getProductBySlug(slug: string): Promise<Product | null> {
-  const products = await getProducts();
-  return products.find((product) => product.slug === slug) ?? null;
+  if (!hasApiConfig) {
+    return demoProducts.find((product) => product.slug === slug) ?? null;
+  }
+  try {
+    return await apiRequest<Product>(`/products/${encodeURIComponent(slug)}`);
+  } catch (error) {
+    if (error instanceof Error && "status" in error && error.status === 404) return null;
+    throw error;
+  }
+}
+
+export function invalidateCatalogCache(): void {
+  categoriesRequest = null;
+  productsRequest = null;
+  categoriesExpireAt = 0;
+  productsExpireAt = 0;
 }

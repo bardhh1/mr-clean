@@ -1,13 +1,20 @@
+import { apiRequest, hasApiConfig } from "@/lib/api";
 import { orderReference } from "@/lib/format";
-import { supabase } from "@/lib/supabase";
-import type { CartItem, CheckoutInput, OrderRecord } from "@/lib/types";
+import type { CartItem, CheckoutInput, OrderReceipt, OrderRecord } from "@/lib/types";
 
-export async function submitOrder(values: CheckoutInput, items: CartItem[]) {
+export async function submitOrder(
+  values: CheckoutInput,
+  items: CartItem[]
+): Promise<OrderReceipt> {
   const total = items.reduce((sum, item) => sum + item.product.price_cents * item.quantity, 0);
+  const attempt = orderAttempt(values, items);
 
-  if (!supabase) {
+  if (!hasApiConfig) {
+    const reference = orderReference();
+    clearOrderAttempt(attempt.signature);
     return {
-      id: orderReference(),
+      id: reference,
+      reference,
       total_cents: total,
       currency: "EUR" as const,
       status: "pending_whatsapp" as const,
@@ -15,51 +22,75 @@ export async function submitOrder(values: CheckoutInput, items: CartItem[]) {
     };
   }
 
-  const payload = {
-    order: values,
-    items: items.map((item) => ({
-      product_id: item.product.id,
-      quantity: item.quantity
-    }))
-  };
-
-  const { data: rpcData, error: rpcError } = await supabase.rpc("create_order_from_cart", payload);
-  if (!rpcError && rpcData) return rpcData as OrderRecord;
-
-  const { data: order, error: orderError } = await supabase
-    .from("orders")
-    .insert({
+  const receipt = await apiRequest<OrderReceipt>("/orders", {
+    method: "POST",
+    body: {
+      idempotency_key: attempt.key,
       ...values,
-      total_cents: total,
-      currency: "EUR",
-      status: "pending_whatsapp"
-    })
-    .select("*")
-    .single();
-
-  if (orderError) throw orderError;
-
-  const orderItems = items.map((item) => ({
-    order_id: order.id,
-    product_id: item.product.id,
-    name_snapshot: item.product.name,
-    quantity: item.quantity,
-    unit_price_cents: item.product.price_cents,
-    line_total_cents: item.product.price_cents * item.quantity
-  }));
-
-  const { error: itemsError } = await supabase.from("order_items").insert(orderItems);
-  if (itemsError) throw itemsError;
-
-  return order as OrderRecord;
+      company_name: values.company_name || undefined,
+      notes: values.notes || undefined,
+      items: items.map((item) => ({
+        product_id: item.product.id,
+        quantity: item.quantity
+      }))
+    }
+  });
+  clearOrderAttempt(attempt.signature);
+  return receipt;
 }
 
-export async function getOrders() {
-  if (!supabase) return [] as OrderRecord[];
-  const { data, error } = await supabase
-    .from("orders")
-    .select("*")
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return (data ?? []) as OrderRecord[];
+export async function getOrders(): Promise<OrderRecord[]> {
+  const response = await apiRequest<{ data: OrderRecord[] }>("/admin/orders?limit=100");
+  return response.data;
+}
+
+export async function getOrder(orderId: string): Promise<OrderRecord> {
+  return apiRequest<OrderRecord>(`/admin/orders/${orderId}`);
+}
+
+export async function updateOrderStatus(
+  orderId: string,
+  status: OrderRecord["status"]
+): Promise<OrderRecord> {
+  return apiRequest<OrderRecord>(`/admin/orders/${orderId}/status`, {
+    method: "PATCH",
+    body: { status }
+  });
+}
+
+const orderAttemptStorageKey = "mr-clean-order-attempt:v1";
+
+function orderAttempt(values: CheckoutInput, items: CartItem[]) {
+  const signature = JSON.stringify({
+    values,
+    items: items.map((item) => ({ id: item.product.id, quantity: item.quantity }))
+  });
+  const saved = readOrderAttempt();
+  if (saved?.signature === signature) return saved;
+
+  const attempt = { signature, key: window.crypto.randomUUID() };
+  window.sessionStorage.setItem(orderAttemptStorageKey, JSON.stringify(attempt));
+  return attempt;
+}
+
+function readOrderAttempt(): { signature: string; key: string } | null {
+  try {
+    const parsed = JSON.parse(
+      window.sessionStorage.getItem(orderAttemptStorageKey) ?? "null"
+    ) as { signature?: unknown; key?: unknown } | null;
+    return parsed
+      && typeof parsed.signature === "string"
+      && typeof parsed.key === "string"
+      ? { signature: parsed.signature, key: parsed.key }
+      : null;
+  } catch {
+    window.sessionStorage.removeItem(orderAttemptStorageKey);
+    return null;
+  }
+}
+
+function clearOrderAttempt(signature: string): void {
+  if (readOrderAttempt()?.signature === signature) {
+    window.sessionStorage.removeItem(orderAttemptStorageKey);
+  }
 }

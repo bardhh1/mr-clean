@@ -1,14 +1,15 @@
 # Mr. Clean
 
-Vite + React + TypeScript e-commerce site for Mr. Clean, a Kosovo business selling sanitary supplies, paper products, cleaning chemicals, aromas, air purifiers and hotel/restaurant supplies.
+Production storefront and order platform for Mr. Clean, a Kosovo sanitary-supply business. Vercel serves the Vite/React frontend; Railway runs the NestJS API, PostgreSQL, and private product-image storage.
 
 ## Features
 
 - Albanian-first public storefront with EUR pricing.
 - Product catalog, category filters, search, detail pages and localStorage cart.
-- Checkout that saves an order in Supabase and opens WhatsApp with a prefilled message.
-- Supabase Auth admin panel for products, categories, images and orders.
-- Demo catalog fallback, so the site runs before Supabase credentials are added.
+- Transactional, idempotent checkout followed by a prefilled WhatsApp confirmation.
+- Cookie-authenticated administration for catalog, images, and order fulfillment.
+- Server-authoritative EUR pricing and immutable order-item snapshots.
+- Demo catalog fallback only when no API URL is configured.
 
 ## Setup
 
@@ -18,28 +19,28 @@ cp .env.example .env
 npm run dev
 ```
 
-Set these variables in `.env` when Supabase is ready:
+Run the NestJS API separately from `backend/`, then set:
 
 ```bash
-VITE_SUPABASE_URL=
-VITE_SUPABASE_ANON_KEY=
+VITE_API_BASE_URL=http://localhost:3000/api/v1
 VITE_WHATSAPP_PHONE=38344123456
 VITE_SITE_URL=http://localhost:5173
 ```
 
-## Supabase
+## Backend
 
-Run `supabase/schema.sql` in the Supabase SQL editor. It creates:
+```bash
+cd backend
+npm install
+cp .env.example .env
+npm run build
+npm run db:migrate
+npm run dev
+```
 
-- `categories`
-- `products`
-- `orders`
-- `order_items`
-- `product-images` storage bucket
-- RLS policies
-- `create_order_from_cart` RPC for server-side price recalculation
+The API is versioned under `/api/v1`. OpenAPI is available at `/api/v1/docs`, and Railway readiness uses `/api/v1/health/ready`.
 
-Create an admin user in Supabase Auth, then use `/admin` to manage the catalog.
+Detailed implementation records live under `backend/docs/phases/`. Each completed phase explains its schema, endpoints, security decisions, Railway impact, and verification.
 
 ## Scripts
 
@@ -48,3 +49,5 @@ npm run dev
 npm run lint
 npm run build
 ```
+
+Backend scripts are documented in `backend/README.md` and the phase guides.

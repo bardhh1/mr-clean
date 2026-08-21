@@ -1,9 +1,10 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
-import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
+import { ThrottlerModule } from "@nestjs/throttler";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { ApiExceptionFilter } from "./common/filters/api-exception.filter";
+import { RailwayThrottlerGuard } from "./common/guards/railway-throttler.guard";
 import { RequestIdInterceptor } from "./common/interceptors/request-id.interceptor";
 import { validateEnvironment } from "./config/env.validation";
 import { CatalogModule } from "./catalog/catalog.module";
@@ -37,7 +38,7 @@ import { StorageModule } from "./storage/storage.module";
     OrdersModule
   ],
   providers: [
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: RailwayThrottlerGuard },
     { provide: APP_INTERCEPTOR, useClass: RequestIdInterceptor },
     { provide: APP_FILTER, useClass: ApiExceptionFilter }
   ]

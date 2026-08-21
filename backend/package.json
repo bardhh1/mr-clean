@@ -1,0 +1,58 @@
+{
+  "name": "@mr-clean/api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "NestJS API for the Mr. Clean storefront and administration workflows",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "nest build",
+    "dev": "nest start --watch",
+    "start": "node dist/main.js",
+    "start:prod": "node dist/main.js",
+    "lint": "eslint \"{src,test}/**/*.ts\"",
+    "db:migrate": "typeorm migration:run -d dist/database/data-source.js",
+    "db:migration:show": "typeorm migration:show -d dist/database/data-source.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "vitest run --config vitest.e2e.config.mts"
+  },
+  "dependencies": {
+    "@nestjs/common": "11.2.1",
+    "@nestjs/config": "4.0.4",
+    "@nestjs/core": "11.2.1",
+    "@nestjs/platform-express": "11.2.1",
+    "@nestjs/swagger": "11.4.7",
+    "@nestjs/throttler": "6.5.0",
+    "@nestjs/typeorm": "11.0.3",
+    "class-transformer": "0.5.1",
+    "class-validator": "0.15.1",
+    "cookie-parser": "1.4.7",
+    "helmet": "8.3.0",
+    "joi": "18.2.5",
+    "pg": "8.23.0",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2",
+    "typeorm": "1.1.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@nestjs/cli": "11.0.24",
+    "@nestjs/testing": "11.2.1",
+    "@types/cookie-parser": "1.4.10",
+    "@types/express": "5.0.6",
+    "@types/node": "22.20.1",
+    "@types/pg": "8.23.1",
+    "@types/supertest": "7.2.1",
+    "@vitest/coverage-v8": "4.1.11",
+    "eslint": "10.9.0",
+    "globals": "17.11.0",
+    "supertest": "7.2.2",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.67.0",
+    "vitest": "4.1.11"
+  }
+}

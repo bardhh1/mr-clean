@@ -1,194 +1,115 @@
-import {
-  ArrowRight,
-  Building2,
-  Check,
-  Droplets,
-  Hotel,
-  PackageCheck,
-  ScrollText,
-  SprayCan
-} from "lucide-react";
+import { ArrowRight, Building2, CheckCircle2, MessageCircle, PackageCheck, Truck } from "lucide-react";
 import { Link } from "react-router-dom";
+import { ContextRail, PosterFrame, TrustItem, categoryRailItems } from "@/components/poster";
 import { ProductCard } from "@/components/product-card";
-import { Button } from "@/components/ui/button";
 import { useCatalog } from "@/hooks/use-catalog";
 
-const categoryIcons = [ScrollText, Droplets, SprayCan, Hotel];
-
-const trustPoints = [
-  "Furnizim për HoReCa dhe zyra",
-  "Çmime të dukshme në EUR",
-  "Porosi direkte në WhatsApp"
-];
-
-const processSteps = [
-  {
-    number: "01",
-    title: "Zgjidh produktet",
-    text: "Kërko në katalog dhe vendos sasitë që i duhen biznesit tënd."
-  },
-  {
-    number: "02",
-    title: "Dërgo porosinë",
-    text: "Plotëso kontaktin dhe porosia përgatitet automatikisht në WhatsApp."
-  },
-  {
-    number: "03",
-    title: "Konfirmo dorëzimin",
-    text: "Ekipi ynë konfirmon stokun, transportin dhe mënyrën e pagesës."
-  }
+const orderSteps = [
+  { number: "01", title: "Zgjidh artikujt", text: "Kërko në katalog, filtro sipas kategorisë dhe vendos sasinë që të duhet." },
+  { number: "02", title: "Plotëso porosinë", text: "Shto kontaktin, adresën dhe mënyrën e preferuar të pagesës." },
+  { number: "03", title: "Konfirmo në WhatsApp", text: "Ekipi ynë kontrollon stokun, transportin dhe kohën e dorëzimit." }
 ];
 
 export function HomePage() {
-  const { categories, products } = useCatalog();
-  const featured = products.filter((product) => product.is_featured).slice(0, 4);
+  const { categories, products, loading } = useCatalog();
+  const featured = products.filter((product) => product.is_featured).slice(0, 3);
+  const categoryProducts = categories.map((category) => ({
+    category,
+    product: products.find((product) => product.category_id === category.id)
+  }));
 
   return (
-    <div>
-      <section className="relative min-h-[640px] overflow-hidden brand-ink md:min-h-[700px]">
-        <img
-          src="https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=2000&q=88"
-          alt="Ekip profesional duke pastruar një ambient biznesi"
-          className="absolute inset-0 h-full w-full object-cover object-center"
-          fetchPriority="high"
-        />
-        <div className="absolute inset-0 bg-[#061c28]/80" />
-        <div className="absolute inset-y-0 right-0 hidden w-[35%] border-l border-white/10 bg-[#0c3548]/50 lg:block" />
+    <PosterFrame rail={<ContextRail items={categoryRailItems.map((item) => ({ number: item.number, label: item.label, href: item.href }))} footer={null} />}>
+      <div className="home-poster">
+        <div className="home-poster__stage">
+          <p className="poster-eyebrow"><span aria-hidden="true" />Mr. Clean <i /> Cleaning Solution</p>
+          <img src="/design/quality-stamp.png" alt="Pastërti profesionale, rezultate profesionale" className="quality-stamp" />
+          <h1 className="hero-title">Furnizim<br />sanitar<br />për<br />biznese.</h1>
 
-        <div className="container relative flex min-h-[640px] items-center py-16 md:min-h-[700px] md:py-20">
-          <div className="max-w-4xl">
-            <div className="flex items-center gap-3 text-xs font-bold uppercase text-cyan-300">
-              <span className="h-px w-10 bg-cyan-300" />
-              Mr. Clean · Cleaning Solution
-            </div>
-            <h1 className="mt-6 max-w-4xl text-5xl font-extrabold leading-[0.98] text-white md:text-7xl">
-              Furnizim sanitar për biznese.
-            </h1>
-            <p className="mt-6 max-w-2xl text-lg leading-8 text-white/[0.72] md:text-xl">
-              Produkte letre, kimikate pastrimi, aroma dhe artikuj hoteli. Të zgjedhura për
-              ambiente ku pastërtia është pjesë e reputacionit.
-            </p>
-            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <Button asChild size="lg" className="bg-cyan-400 text-[#061c28] hover:bg-cyan-300 active:bg-cyan-200">
-                <Link to="/produkte">
-                  Shfleto produktet
-                  <ArrowRight className="h-5 w-5" aria-hidden="true" />
-                </Link>
-              </Button>
-            </div>
-
-            <div className="mt-12 grid max-w-4xl border-y border-white/[0.16] sm:grid-cols-3">
-              {trustPoints.map((point) => (
-                <div
-                  key={point}
-                  className="flex min-h-16 items-center gap-3 border-b border-white/[0.16] py-4 text-sm font-semibold text-white/[0.78] last:border-b-0 sm:border-b-0 sm:border-r sm:px-5 sm:first:pl-0 sm:last:border-r-0"
-                >
-                  <Check className="h-4 w-4 shrink-0 text-cyan-300" aria-hidden="true" />
-                  {point}
-                </div>
-              ))}
-            </div>
+          <div className="hero-products" aria-hidden="true">
+            <img src="/design/hero-products.png" alt="" fetchPriority="high" />
           </div>
+        </div>
+
+        <div className="home-trust" aria-label="Përfitimet e shërbimit">
+          <TrustItem icon={Building2} title="Furnizim për HoReCa dhe zyra" text="Zgjidhje profesionale për çdo ambient." />
+          <TrustItem icon={Truck} title="Çmimet të dukshme në EUR" text="Transparencë dhe kursim për biznesin tuaj." />
+          <TrustItem icon={MessageCircle} title="Porosi direkte në WhatsApp" text="Mbështetje e shpejtë dhe komunikim i drejtpërdrejtë." />
+        </div>
+      </div>
+
+      <section className="home-section home-featured" aria-labelledby="featured-title">
+        <header className="home-section__intro">
+          <div>
+            <p className="poster-eyebrow"><span aria-hidden="true" />Më të kërkuarat</p>
+            <h2 id="featured-title">Produkte që<br />punojnë fort.</h2>
+          </div>
+          <div className="home-section__copy">
+            <p>Artikujt bazë për pastërtinë e përditshme, të zgjedhur për ritmin e restoranteve, zyrave dhe hoteleve.</p>
+            <Link to="/produkte">Shiko të gjithë katalogun <ArrowRight aria-hidden="true" /></Link>
+          </div>
+        </header>
+
+        {loading ? (
+          <div className="product-grid home-product-grid" aria-label="Duke ngarkuar produktet">
+            {Array.from({ length: 3 }).map((_, index) => <div key={index} className="product-skeleton" />)}
+          </div>
+        ) : (
+          <div className="product-grid home-product-grid">
+            {featured.map((product) => <ProductCard key={product.id} product={product} />)}
+          </div>
+        )}
+      </section>
+
+      <section className="home-section category-index" aria-labelledby="category-title">
+        <header className="category-index__header">
+          <p className="poster-eyebrow"><span aria-hidden="true" />Katalogu sipas nevojës</p>
+          <h2 id="category-title">Çdo ambient.<br />Një standard.</h2>
+          <p>Nga tavolina e restorantit te dhoma e hotelit—një furnizues i vetëm, pa humbur kohë.</p>
+        </header>
+
+        <div className="category-index__list">
+          {categoryProducts.map(({ category, product }, index) => (
+            <Link key={category.id} to={`/produkte?category=${category.slug}`} className="category-row">
+              <span className="category-row__number">{String(index + 1).padStart(2, "0")}</span>
+              <span className="category-row__image">{product ? <img src={product.image_urls[0]} alt="" /> : null}</span>
+              <span className="category-row__content"><strong>{category.name}</strong><small>{category.description}</small></span>
+              <ArrowRight aria-hidden="true" />
+            </Link>
+          ))}
         </div>
       </section>
 
-      <section className="brand-mist border-b">
-        <div className="section-shell">
-          <div className="grid gap-8 lg:grid-cols-[0.75fr_1.25fr] lg:items-end">
-            <div>
-              <p className="hairline-label">Kategoritë</p>
-              <h2 className="mt-5 text-3xl font-extrabold leading-tight md:text-5xl">
-                Gjithçka për një ambient të pastër.
-              </h2>
-            </div>
-            <p className="max-w-2xl text-base leading-7 text-muted-foreground lg:justify-self-end">
-              Nga tavolina e restorantit deri te banjoja, kuzhina dhe aroma e ambientit. Një
-              partner i vetëm për furnizimin e përditshëm.
-            </p>
-          </div>
+      <section className="home-section order-process" aria-labelledby="process-title">
+        <div className="order-process__statement">
+          <p className="poster-eyebrow poster-eyebrow--light"><span aria-hidden="true" />Porosi pa humbur kohë</p>
+          <h2 id="process-title">Nga rafti<br />në derë.</h2>
+          <p>Një proces i qartë për biznese që duan furnizim të rregullt, jo pengesa të panevojshme.</p>
+          <Link to="/produkte" className="poster-cta poster-cta--light">Fillo porosinë <ArrowRight aria-hidden="true" /></Link>
+        </div>
 
-          <div className="mt-10 grid border-l border-t sm:grid-cols-2 lg:grid-cols-4">
-            {categories.map((category, index) => {
-              const Icon = categoryIcons[index % categoryIcons.length];
-              return (
-                <Link
-                  to={`/produkte?category=${category.slug}`}
-                  key={category.id}
-                  className="group min-h-64 border-b border-r bg-white p-6 transition-colors hover:bg-secondary/60"
-                >
-                  <div className="flex items-start justify-between">
-                    <Icon className="h-7 w-7 text-primary" aria-hidden="true" />
-                    <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary" aria-hidden="true" />
-                  </div>
-                  <h3 className="mt-14 text-xl font-bold leading-7">{category.name}</h3>
-                  <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                    {category.description}
-                  </p>
-                </Link>
-              );
-            })}
-          </div>
+        <div className="order-process__steps">
+          {orderSteps.map((step) => (
+            <article key={step.number}>
+              <span>{step.number}</span>
+              <div><h3>{step.title}</h3><p>{step.text}</p></div>
+              <CheckCircle2 aria-hidden="true" />
+            </article>
+          ))}
         </div>
       </section>
 
-      <section className="bg-white">
-        <div className="section-shell">
-          <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
-            <div>
-              <p className="hairline-label">Më të kërkuarat</p>
-              <h2 className="mt-5 text-3xl font-extrabold md:text-5xl">Zgjedhjet e bizneseve</h2>
-            </div>
-            <Button asChild variant="outline">
-              <Link to="/produkte">
-                Shiko të gjitha
-                <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </Link>
-            </Button>
-          </div>
-          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {featured.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
+      <section className="home-final-cta" aria-labelledby="final-cta-title">
+        <img src="/brand/mr-clean-logo.png" alt="Mr. Clean Cleaning Solution" />
+        <div>
+          <p className="poster-eyebrow"><span aria-hidden="true" />Furnizimi i radhës</p>
+          <h2 id="final-cta-title">Gati kur është<br />biznesi juaj.</h2>
+        </div>
+        <div className="home-final-cta__action">
+          <p>Çmime të qarta, produkte profesionale dhe konfirmim direkt me ekipin tonë.</p>
+          <Link to="/produkte" className="poster-cta">Hap katalogun <PackageCheck aria-hidden="true" /></Link>
         </div>
       </section>
-
-      <section className="bg-white">
-        <div className="section-shell">
-          <div className="grid gap-8 lg:grid-cols-[0.7fr_1.3fr]">
-            <div>
-              <p className="hairline-label">Si funksionon</p>
-              <h2 className="mt-5 text-3xl font-extrabold md:text-5xl">Porosi pa humbur kohë.</h2>
-              <div className="mt-6 flex items-center gap-3 text-sm font-semibold text-muted-foreground">
-                <Building2 className="h-5 w-5 text-primary" aria-hidden="true" />
-                E ndërtuar për blerje biznesi
-              </div>
-            </div>
-            <div className="border-t">
-              {processSteps.map((step) => (
-                <div key={step.number} className="grid gap-3 border-b py-7 sm:grid-cols-[64px_1fr_1.2fr] sm:items-start">
-                  <span className="text-sm font-bold tabular-nums text-primary">{step.number}</span>
-                  <h3 className="text-lg font-bold">{step.title}</h3>
-                  <p className="text-sm leading-6 text-muted-foreground">{step.text}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-16 flex flex-col justify-between gap-6 border-t border-foreground/20 pt-8 md:flex-row md:items-center">
-            <div className="flex items-start gap-4">
-              <PackageCheck className="mt-1 h-7 w-7 shrink-0 text-accent" aria-hidden="true" />
-              <div>
-                <h3 className="text-xl font-bold">Gati për furnizimin e radhës?</h3>
-                <p className="mt-1 text-sm text-muted-foreground">Zgjidh produktet dhe dërgo porosinë në pak minuta.</p>
-              </div>
-            </div>
-            <Button asChild size="lg">
-              <Link to="/produkte">Hap katalogun</Link>
-            </Button>
-          </div>
-        </div>
-      </section>
-    </div>
+    </PosterFrame>
   );
 }

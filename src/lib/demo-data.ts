@@ -42,11 +42,11 @@ export const demoProducts: Product[] = [
     name: "Peceta të bardha 33x33",
     slug: "peceta-te-bardha-33x33",
     description: "Pako profesionale për restorante, kafiteri dhe evente me përdorim të shpeshtë.",
-    price_cents: 420,
+    price_cents: 240,
     currency: "EUR",
     unit: "pako",
     image_urls: [
-      "https://images.unsplash.com/photo-1603204077779-bed963ea7d0e?auto=format&fit=crop&w=1200&q=80"
+      "/products/napkins-pack.png"
     ],
     is_active: true,
     is_featured: true,
@@ -63,7 +63,7 @@ export const demoProducts: Product[] = [
     currency: "EUR",
     unit: "bidon 5L",
     image_urls: [
-      "https://images.unsplash.com/photo-1563453392212-326f5e854473?auto=format&fit=crop&w=1200&q=80"
+      "/products/floor-cleaner-5l.png"
     ],
     is_active: true,
     is_featured: true,
@@ -76,11 +76,11 @@ export const demoProducts: Product[] = [
     name: "Dezinfektues sipërfaqesh 1L",
     slug: "dezinfektues-siperfaqesh-1l",
     description: "Për tavolina, banakë, kuzhina dhe hapësira ku higjiena duhet të jetë konstante.",
-    price_cents: 360,
+    price_cents: 450,
     currency: "EUR",
     unit: "shishe",
     image_urls: [
-      "https://images.unsplash.com/photo-1583947215259-38e31be8751f?auto=format&fit=crop&w=1200&q=80"
+      "/products/disinfectant-1l.png"
     ],
     is_active: true,
     is_featured: false,
@@ -93,11 +93,11 @@ export const demoProducts: Product[] = [
     name: "Aparat arome me avull",
     slug: "aparat-arome-me-avull",
     description: "Aparat për aromatizim ambienti në recepsione, zyra, lokale dhe hotele.",
-    price_cents: 3490,
+    price_cents: 3990,
     currency: "EUR",
     unit: "copë",
     image_urls: [
-      "https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?auto=format&fit=crop&w=1200&q=80"
+      "/products/aroma-machine.png"
     ],
     is_active: true,
     is_featured: true,
@@ -110,11 +110,11 @@ export const demoProducts: Product[] = [
     name: "Aromë ambienti 250ml",
     slug: "arome-ambienti-250ml",
     description: "Rimbushje për aparat arome, e përshtatshme për ambiente me qarkullim të lartë.",
-    price_cents: 690,
+    price_cents: 630,
     currency: "EUR",
     unit: "shishe",
     image_urls: [
-      "https://images.unsplash.com/photo-1602928321679-560bb453f190?auto=format&fit=crop&w=1200&q=80"
+      "/products/aroma-bottle-250ml.png"
     ],
     is_active: true,
     is_featured: false,
@@ -127,11 +127,11 @@ export const demoProducts: Product[] = [
     name: "Shampo hoteli 30ml",
     slug: "shampo-hoteli-30ml",
     description: "Format ekonomik për dhoma hoteli, bujtina dhe apartamente me qira.",
-    price_cents: 24,
+    price_cents: 55,
     currency: "EUR",
     unit: "copë",
     image_urls: [
-      "https://images.unsplash.com/photo-1556228578-8c89e6adf883?auto=format&fit=crop&w=1200&q=80"
+      "/products/hotel-shampoo-30ml.png"
     ],
     is_active: true,
     is_featured: false,

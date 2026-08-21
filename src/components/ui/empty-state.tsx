@@ -16,7 +16,7 @@ export function EmptyState({
 }) {
   return (
     <div className={cn("surface flex flex-col items-center gap-3 p-8 text-center", className)}>
-      <div className="rounded-full bg-secondary p-3 text-primary">
+      <div className="border border-primary bg-secondary p-3 text-primary">
         <Icon className="h-6 w-6" aria-hidden="true" />
       </div>
       <div>

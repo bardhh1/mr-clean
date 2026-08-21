@@ -9,8 +9,8 @@ type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 const variants = {
-  default: "bg-primary text-primary-foreground shadow-sm hover:bg-[#185f7d] active:bg-[#124b64]",
-  secondary: "bg-secondary text-secondary-foreground hover:bg-[#d5edf5] active:bg-[#c4e4ee]",
+  default: "border border-primary bg-primary text-primary-foreground hover:border-foreground hover:bg-foreground",
+  secondary: "border border-primary bg-secondary text-secondary-foreground hover:bg-primary hover:text-white",
   outline: "border border-input bg-card hover:border-foreground/40 hover:bg-muted/60",
   ghost: "hover:bg-muted active:bg-muted/80",
   destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90"
@@ -29,7 +29,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <Comp
         className={cn(
-          "inline-flex items-center justify-center gap-2 rounded-md text-sm font-semibold transition-colors duration-200 disabled:pointer-events-none disabled:opacity-50",
+          "inline-flex items-center justify-center gap-2 rounded-none text-sm font-semibold transition-colors duration-200 disabled:pointer-events-none disabled:opacity-50",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
           variants[variant],
           sizes[size],

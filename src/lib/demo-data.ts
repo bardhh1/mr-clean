@@ -38,6 +38,7 @@ export const demoCategories: Category[] = [
 export const demoProducts: Product[] = [
   {
     id: "prod-napkin-white",
+    catalog_code: null,
     category_id: "cat-napkins",
     name: "Peceta të bardha 33x33",
     slug: "peceta-te-bardha-33x33",
@@ -55,6 +56,7 @@ export const demoProducts: Product[] = [
   },
   {
     id: "prod-floor-cleaner",
+    catalog_code: null,
     category_id: "cat-chemicals",
     name: "Detergjent dyshemeje 5L",
     slug: "detergjent-dyshemeje-5l",
@@ -72,6 +74,7 @@ export const demoProducts: Product[] = [
   },
   {
     id: "prod-disinfectant",
+    catalog_code: null,
     category_id: "cat-chemicals",
     name: "Dezinfektues sipërfaqesh 1L",
     slug: "dezinfektues-siperfaqesh-1l",
@@ -89,6 +92,7 @@ export const demoProducts: Product[] = [
   },
   {
     id: "prod-aroma-machine",
+    catalog_code: null,
     category_id: "cat-aroma",
     name: "Aparat arome me avull",
     slug: "aparat-arome-me-avull",
@@ -106,6 +110,7 @@ export const demoProducts: Product[] = [
   },
   {
     id: "prod-aroma-refill",
+    catalog_code: null,
     category_id: "cat-aroma",
     name: "Aromë ambienti 250ml",
     slug: "arome-ambienti-250ml",
@@ -123,6 +128,7 @@ export const demoProducts: Product[] = [
   },
   {
     id: "prod-hotel-shampoo",
+    catalog_code: null,
     category_id: "cat-hotel",
     name: "Shampo hoteli 30ml",
     slug: "shampo-hoteli-30ml",

@@ -15,6 +15,12 @@ import {
 } from "class-validator";
 
 export class CreateProductDto {
+  @ApiPropertyOptional({ pattern: "^[0-9]{4}$" })
+  @IsOptional()
+  @IsString()
+  @Matches(/^[0-9]{4}$/)
+  catalog_code?: string;
+
   @ApiProperty()
   @IsUUID()
   category_id!: string;

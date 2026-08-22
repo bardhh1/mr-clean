@@ -15,6 +15,10 @@ export class ProductEntity {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
+  @Index({ unique: true })
+  @Column({ type: "text", nullable: true })
+  catalog_code!: string | null;
+
   @Index()
   @Column({ type: "uuid" })
   category_id!: string;

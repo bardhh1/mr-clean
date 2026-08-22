@@ -47,6 +47,7 @@ export async function upsertCategory(category: Partial<Category> & { name: strin
 
 export async function upsertProduct(product: Partial<Product> & { name: string; category_id: string }) {
   const payload = {
+    catalog_code: product.catalog_code || undefined,
     category_id: product.category_id,
     name: product.name,
     slug: product.slug || slugify(product.name),

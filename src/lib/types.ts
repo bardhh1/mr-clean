@@ -9,6 +9,7 @@ export type Category = {
 
 export type Product = {
   id: string;
+  catalog_code: string | null;
   category_id: string;
   name: string;
   slug: string;
@@ -22,6 +23,7 @@ export type Product = {
   is_featured: boolean;
   requires_quote: boolean;
   stock_label: string;
+  category?: Category;
 };
 
 export type CartItem = {

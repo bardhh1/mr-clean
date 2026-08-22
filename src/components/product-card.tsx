@@ -14,7 +14,9 @@ export function ProductCard({ product }: { product: Product }) {
         <img src={product.image_urls[0]} alt={product.name} loading="lazy" />
       </Link>
       <div className="product-card__body">
-        <p className="product-card__stock">{product.stock_label}</p>
+        <p className="product-card__stock">
+          {product.catalog_code ? `Kodi ${product.catalog_code} · ` : ""}{product.stock_label}
+        </p>
         <Link to={`/produkte/${product.slug}`}><h3>{product.name}</h3></Link>
         <p className="product-card__description">{product.description}</p>
         <p className="product-card__unit">{product.unit}</p>

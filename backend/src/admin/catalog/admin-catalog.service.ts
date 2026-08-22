@@ -28,7 +28,7 @@ export class AdminCatalogService {
   listProducts(): Promise<ProductEntity[]> {
     return this.products.find({
       relations: { category: true },
-      order: { name: "ASC" }
+      order: { catalog_code: "ASC", name: "ASC" }
     });
   }
 
@@ -71,6 +71,7 @@ export class AdminCatalogService {
     await this.requireCategory(input.category_id);
     const entity = this.products.create({
       ...input,
+      catalog_code: input.catalog_code?.trim() || null,
       name: input.name.trim(),
       slug: input.slug ?? slugify(input.name),
       description: input.description.trim(),
@@ -94,6 +95,7 @@ export class AdminCatalogService {
 
     this.products.merge(entity, {
       ...input,
+      catalog_code: input.catalog_code?.trim() || (input.catalog_code === "" ? null : undefined),
       name: input.name?.trim(),
       description: input.description?.trim(),
       stock_label: input.stock_label?.trim()
@@ -128,7 +130,7 @@ export class AdminCatalogService {
       return await this.products.save(entity);
     } catch (error) {
       if (databaseCode(error) === "23505") {
-        throw new ConflictException("Product slug already exists");
+        throw new ConflictException("Product slug or catalog code already exists");
       }
       throw error;
     }

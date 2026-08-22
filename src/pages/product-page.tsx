@@ -29,7 +29,9 @@ export function ProductPage() {
         const products = await productsRequest.catch(() => []);
         if (!cancelled) {
           setProduct(current);
-          setRelated(products.filter((item) => item.id !== current?.id).slice(0, 3));
+          setRelated(products
+            .filter((item) => item.id !== current?.id && item.category_id === current?.category_id)
+            .slice(0, 3));
         }
       } catch (loadError) {
         if (!cancelled) {
@@ -46,7 +48,7 @@ export function ProductPage() {
   const rail = <ContextRail items={[
     { number: "01", label: "Përdorimi", meta: "Profesional" },
     { number: "02", label: "Vëllimi", meta: product?.unit ?? "—" },
-    { number: "03", label: "Kategoria", meta: "Higjienë" },
+    { number: "03", label: "Kategoria", meta: product?.category?.name ?? "Higjienë" },
     { number: "04", label: "Dorëzimi", meta: "Me konfirmim" }
   ]} />;
 
@@ -73,7 +75,10 @@ export function ProductPage() {
 
           <div className="product-detail__buy">
             <span className="locator-bar" aria-hidden="true" />
-            <p className="stock-line"><CheckCircle2 aria-hidden="true" />{product.stock_label}</p>
+            <p className="stock-line">
+              <CheckCircle2 aria-hidden="true" />
+              {product.catalog_code ? `Kodi ${product.catalog_code} · ` : ""}{product.stock_label}
+            </p>
             <p className="product-detail__description">{product.description}</p>
             <div className="price-block">
               <span>Çmimi</span>

@@ -53,13 +53,14 @@ export class CatalogService {
 
     if (query.search) {
       builder.andWhere(
-        "(product.name ILIKE :search OR product.description ILIKE :search)",
+        "(product.name ILIKE :search OR product.description ILIKE :search OR product.catalog_code ILIKE :search)",
         { search: `%${query.search}%` }
       );
     }
 
     builder
       .orderBy("product.is_featured", "DESC")
+      .addOrderBy("product.catalog_code", "ASC", "NULLS LAST")
       .addOrderBy("product.name", "ASC")
       .skip(query.offset)
       .take(query.limit);

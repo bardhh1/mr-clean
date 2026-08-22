@@ -43,6 +43,7 @@ const categorySchema = z.object({
 });
 
 const productSchema = z.object({
+  catalog_code: z.string().regex(/^\d{4}$/, "Kodi duhet të ketë 4 shifra.").optional().or(z.literal("")),
   name: z.string().min(2, "Shkruani emrin e produktit."),
   category_id: z.string().min(1, "Zgjedhni kategorinë."),
   description: z.string().min(8, "Shtoni përshkrim më të qartë."),
@@ -158,6 +159,7 @@ export function AdminPage() {
       const file = values.image_file?.item?.(0) as File | undefined;
       const uploaded = file ? await uploadProductImage(file) : null;
       await upsertProduct({
+        catalog_code: values.catalog_code || null,
         name: values.name,
         category_id: values.category_id,
         description: values.description,
@@ -340,6 +342,9 @@ export function AdminPage() {
             </CardHeader>
             <CardContent>
               <form className="grid gap-4" onSubmit={productForm.handleSubmit(onProductSubmit)}>
+                <Field label="Kodi i katalogut" error={productForm.formState.errors.catalog_code?.message}>
+                  <Input inputMode="numeric" maxLength={4} placeholder="p.sh. 0052" {...productForm.register("catalog_code")} />
+                </Field>
                 <Field label="Emri" error={productForm.formState.errors.name?.message}>
                   <Input {...productForm.register("name")} />
                 </Field>
@@ -406,7 +411,9 @@ export function AdminPage() {
                   <tbody className="divide-y">
                     {products.map((product) => (
                       <tr key={product.id}>
-                        <td className="px-3 py-4 font-semibold">{product.name}</td>
+                        <td className="px-3 py-4 font-semibold">
+                          {product.catalog_code ? `${product.catalog_code} · ` : ""}{product.name}
+                        </td>
                         <td className="px-3 py-4 tabular-nums">
                           {product.requires_quote ? "Me ofertë" : formatCurrency(product.price_cents)}
                         </td>

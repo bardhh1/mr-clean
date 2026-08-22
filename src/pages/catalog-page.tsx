@@ -1,7 +1,7 @@
 import { PackageSearch, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ContextRail, PageIntro, PosterFrame, categoryRailItems } from "@/components/poster";
+import { ContextRail, PageIntro, PosterFrame } from "@/components/poster";
 import { ProductCard } from "@/components/product-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useCatalog } from "@/hooks/use-catalog";
@@ -16,18 +16,21 @@ export function CatalogPage() {
   const filtered = useMemo(() => products.filter((product) => {
     const category = categories.find((item) => item.id === product.category_id);
     const matchesCategory = selected === "all" || category?.slug === selected;
-    const searchable = `${product.name} ${product.description}`.toLowerCase();
+    const searchable = `${product.catalog_code ?? ""} ${product.name} ${product.description}`.toLowerCase();
     return matchesCategory && searchable.includes(query.trim().toLowerCase());
   }), [categories, products, query, selected]);
 
   const selectedCategory = categories.find((category) => category.slug === selected);
-  const railItems = categoryRailItems.map((item) => ({
-    ...item,
-    active: selected === item.href?.split("=")[1]
-  }));
+  const railItems = useMemo(() => categories.map((category, index) => ({
+    number: String(index + 1).padStart(2, "0"),
+    label: category.name,
+    meta: String(products.filter((product) => product.category_id === category.id).length),
+    href: `/produkte?category=${category.slug}`,
+    active: selected === category.slug
+  })), [categories, products, selected]);
 
   return (
-    <PosterFrame rail={<ContextRail items={railItems} />}>
+    <PosterFrame className="catalog-frame" rail={<ContextRail items={railItems} footer={null} />}>
       <div className="catalog-page poster-page">
         <PageIntro title="Produktet" aside={<img src="/design/quality-stamp.png" alt="Pastërti profesionale" />} />
 
@@ -48,7 +51,7 @@ export function CatalogPage() {
 
         <div className="catalog-toolbar">
           <div><span className="locator-bar" aria-hidden="true" /><strong>{selectedCategory?.name ?? "Të gjitha produktet"}</strong><i />{filtered.length} produkte</div>
-          <span>Rendit sipas: <strong>Më të rejat</strong></span>
+          <span>Rendit sipas: <strong>Katalogut</strong></span>
         </div>
 
         {error ? <EmptyState icon={PackageSearch} title="Nuk u lexua katalogu" description={error} /> : null}

@@ -21,13 +21,22 @@ export function CatalogPage() {
   }), [categories, products, query, selected]);
 
   const selectedCategory = categories.find((category) => category.slug === selected);
-  const railItems = useMemo(() => categories.map((category, index) => ({
-    number: String(index + 1).padStart(2, "0"),
-    label: category.name,
-    meta: String(products.filter((product) => product.category_id === category.id).length),
-    href: `/produkte?category=${category.slug}`,
-    active: selected === category.slug
-  })), [categories, products, selected]);
+  const railItems = useMemo(() => [
+    {
+      number: "00",
+      label: "Të gjitha",
+      meta: String(products.length),
+      href: "/produkte",
+      active: selected === "all"
+    },
+    ...categories.map((category, index) => ({
+      number: String(index + 1).padStart(2, "0"),
+      label: category.name,
+      meta: String(products.filter((product) => product.category_id === category.id).length),
+      href: `/produkte?category=${category.slug}`,
+      active: selected === category.slug
+    }))
+  ], [categories, products, selected]);
 
   return (
     <PosterFrame className="catalog-frame" rail={<ContextRail items={railItems} footer={null} />}>

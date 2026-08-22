@@ -98,11 +98,13 @@
 .context-rail__footer { min-height: 188px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 20px; background: var(--poster-blue); color: white; text-align: center; }
 .context-rail__footer img { width: 92px; height: 92px; object-fit: contain; filter: brightness(0) invert(1); }
 .context-rail__footer span { max-width: 120px; font-size: 10px; line-height: 1.35; letter-spacing: .12em; text-transform: uppercase; opacity: .82; }
-.catalog-frame .context-rail > .locator-bar { margin: 44px 24px 20px; }
-.catalog-frame .context-rail__item { min-height: 0; flex: 1; padding: 10px 24px; }
-.catalog-frame .context-rail__number { font-size: 34px; }
-.catalog-frame .context-rail__dash { margin: 2px 0 4px; }
-.catalog-frame .context-rail__label { font-size: 15px; }
+.catalog-frame .context-rail > .locator-bar { margin: 30px 20px 14px; }
+.catalog-frame .context-rail__items { min-height: 0; }
+.catalog-frame .context-rail__item { min-height: 0; flex: 1 1 0; display: grid; grid-template-columns: 44px minmax(0, 1fr); grid-template-rows: auto auto; align-content: center; gap: 2px 7px; padding: 6px 16px; }
+.catalog-frame .context-rail__number { grid-row: 1 / span 2; align-self: center; font-size: 30px; }
+.catalog-frame .context-rail__dash { display: none; }
+.catalog-frame .context-rail__label { max-width: none; align-self: end; font-size: 13px; line-height: 1.12; }
+.catalog-frame .context-rail__meta { margin-top: 0; align-self: start; font-size: 11px; }
 
 .poster-page { padding: 84px 56px 60px; }
 .poster-eyebrow { display: flex; align-items: center; gap: 13px; color: var(--poster-blue); font-family: "Arial Narrow", "Helvetica Neue", sans-serif; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }

@@ -40,9 +40,9 @@ The frontend previously declared most packages as `latest`. Although the lockfil
 
 Every direct frontend dependency and development dependency is now declared at the exact version already present in the verified lockfile. This changes no installed package version. Future updates must arrive as explicit source changes and pass CI, coverage, E2E, CodeQL, and dependency review as applicable.
 
-## Remaining repository setting
+## Repository-native security settings
 
-GitHub secret scanning and push protection are repository-level controls rather than workflow files. They should be enabled in the repository's Code security settings before admin credentials or deployment tokens are introduced to any developer workflow.
+GitHub secret scanning and push protection were already enabled. Dependabot vulnerability alerts and automatic security updates were enabled after the workflow passed. GitHub reported that non-provider secret patterns and secret validity checks remain unavailable or disabled for the current repository configuration; the standard provider-pattern scan and push blocking remain active.
 
 ## Verification
 

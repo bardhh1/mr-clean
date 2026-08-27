@@ -5,6 +5,7 @@ export default defineConfig({
     environment: "node",
     globals: true,
     include: ["test/**/*.e2e-spec.ts"],
+    fileParallelism: false,
     restoreMocks: true,
     testTimeout: 15_000
   }

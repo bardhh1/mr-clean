@@ -44,7 +44,7 @@ Before writing the workflow, the same gates were executed from clean lockfile in
 - Backend: install, lint, 19 unit tests across 8 files, build, and dependency audit passed.
 - Both dependency audits reported zero known vulnerabilities at the configured threshold.
 
-The workflow YAML was parsed locally after creation. A GitHub-hosted run is still required before making either job a required branch-protection check.
+The workflow YAML was parsed locally after creation. GitHub-hosted run `33074707779` then completed successfully for commit `6bc8b96`: `Frontend checks` passed in 17 seconds and `Backend checks` passed in 27 seconds.
 
 ## Known gates intentionally deferred
 
@@ -57,9 +57,9 @@ The frontend also does not yet have a committed automated test suite. These are 
 
 ## Activation sequence
 
-1. Push this workflow to the non-production branch.
-2. Confirm `Frontend checks` and `Backend checks` complete successfully on GitHub-hosted runners.
-3. Correct any runner-only differences before changing deployment settings.
-4. After the test baseline is strengthened, protect `main` and require both checks for pull requests.
+1. The workflow was pushed to the non-production branch.
+2. `Frontend checks` and `Backend checks` completed successfully on GitHub-hosted runners.
+3. No runner-only differences were found.
+4. After the test baseline is strengthened, protect `main` and require the verified checks for pull requests.
 
 Production deployment remains owned by the existing Vercel and Railway Git integrations during this phase.

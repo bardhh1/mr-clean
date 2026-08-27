@@ -76,3 +76,68 @@ jobs:
 
       - name: Audit backend dependencies
         run: npm audit --audit-level=high
+
+  backend-e2e:
+    name: Backend E2E
+    needs: backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      NODE_ENV: test
+      PORT: 3000
+      API_PREFIX: api/v1
+      CORS_ORIGINS: http://localhost:5173
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mr_clean_test
+      DATABASE_SSL: "false"
+      DATABASE_POOL_MAX: 5
+      JWT_ACCESS_SECRET: ci-only-signing-secret-not-used-outside-tests
+      JWT_ACCESS_TTL_SECONDS: 900
+      REFRESH_TOKEN_TTL_DAYS: 30
+      AUTH_COOKIE_SECURE: "false"
+      AUTH_COOKIE_SAME_SITE: lax
+      AWS_ENDPOINT_URL: https://storage.invalid
+      AWS_ACCESS_KEY_ID: ci-access-key
+      AWS_SECRET_ACCESS_KEY: ci-secret-key-not-used-outside-tests
+      AWS_S3_BUCKET_NAME: ci-product-images
+      AWS_DEFAULT_REGION: auto
+      AWS_S3_URL_STYLE: path
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: mr_clean_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d mr_clean_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build migration artifacts
+        run: npm run build
+
+      - name: Migrate ephemeral database
+        run: npm run db:migrate
+
+      - name: Run backend end-to-end tests
+        run: npm run test:e2e

@@ -46,4 +46,4 @@ GitHub secret scanning and push protection are repository-level controls rather 
 
 ## Verification
 
-The pinned declarations are validated with a clean `npm ci`, lint, production build, and complete dependency audit. The security workflow is considered active only after its CodeQL job succeeds on a GitHub-hosted runner.
+The pinned declarations were validated with a clean `npm ci`, lint, production build, and complete dependency audit. GitHub Actions security run `33096765744` completed successfully for commit `ee23bb4`, including the CodeQL analysis. Dependency review was correctly skipped because the triggering event was a branch push; it is scoped to pull requests. CI run `33096765575` independently passed all three quality jobs for the same commit.

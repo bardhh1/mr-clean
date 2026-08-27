@@ -41,7 +41,7 @@ The enforced baseline is:
 - 94.00% functions;
 - 95.23% lines.
 
-Lint, coverage, and the NestJS production build pass together. A GitHub-hosted run is required before this phase is made a protected-branch requirement.
+Lint, coverage, and the NestJS production build pass together. GitHub Actions run `33096258027` completed successfully for commit `2e5970d`: `Frontend checks`, coverage-enforced `Backend checks`, and the PostgreSQL-backed `Backend E2E` job all passed. Railway created no candidate because production was already following `main`.
 
 ## Deployment isolation correction
 

@@ -1,6 +1,6 @@
 import { ArrowRight, Building2, CheckCircle2, MessageCircle, PackageCheck, Truck } from "lucide-react";
 import { Link } from "react-router-dom";
-import { ContextRail, PosterFrame, TrustItem, categoryRailItems } from "@/components/poster";
+import { PosterFrame, TrustItem } from "@/components/poster";
 import { ProductCard } from "@/components/product-card";
 import { useCatalog } from "@/hooks/use-catalog";
 
@@ -19,7 +19,7 @@ export function HomePage() {
   }));
 
   return (
-    <PosterFrame rail={<ContextRail items={categoryRailItems.map((item) => ({ number: item.number, label: item.label, href: item.href }))} footer={null} />}>
+    <PosterFrame>
       <div className="home-poster">
         <div className="home-poster__stage">
           <p className="poster-eyebrow"><span aria-hidden="true" />Mr. Clean <i /> Cleaning Solution</p>

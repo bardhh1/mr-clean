@@ -13,7 +13,7 @@ describe("HealthService", () => {
     expect(query).not.toHaveBeenCalled();
   });
 
-  it("only reports ready after Supabase responds", async () => {
+  it("only reports ready after PostgreSQL responds", async () => {
     const query = vi.fn().mockResolvedValue([{ "?column?": 1 }]);
     const database = { query } as unknown as DataSource;
 

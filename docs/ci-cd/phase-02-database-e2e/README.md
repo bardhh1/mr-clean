@@ -41,7 +41,9 @@ The workflow uses explicit inert values for JWT and S3 configuration because app
 
 ## Verification
 
-Local lint, unit tests, and compilation validate the test source and bootstrap refactor. The full E2E run requires PostgreSQL and is therefore verified on the GitHub-hosted runner before this phase is considered complete.
+Local lint, unit tests, and compilation validated the test source and bootstrap refactor. GitHub Actions run `33075831000` then completed successfully for commit `0014c94`: all five public API E2E scenarios passed after the complete migration chain ran against the PostgreSQL 18 service.
+
+The same commit produced a healthy Railway candidate because production was still connected to the feature branch at that moment. Migrations completed without schema changes, the readiness gate passed, and the live API continued reporting PostgreSQL as available.
 
 ## Deferred work
 

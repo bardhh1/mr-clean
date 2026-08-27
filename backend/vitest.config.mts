@@ -5,6 +5,10 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "json-summary"],
+      exclude: [
+        "src/**/*.entity.ts",
+        "src/database/migrations/**"
+      ],
       thresholds: {
         branches: 75,
         functions: 80,

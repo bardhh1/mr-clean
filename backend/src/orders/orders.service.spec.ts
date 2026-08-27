@@ -86,6 +86,65 @@ function transactionalService(productOverrides: Partial<ProductEntity> = {}) {
   };
 }
 
+function existingOrder(status: OrderEntity["status"] = "pending_whatsapp"): OrderEntity {
+  return {
+    id: "31111111-1111-4111-8111-111111111111",
+    reference: "MC-TESTREFERENCE",
+    idempotency_key: input.idempotency_key,
+    request_hash: "request-hash",
+    customer_name: input.customer_name,
+    company_name: input.company_name ?? null,
+    phone: input.phone,
+    city: input.city,
+    address: input.address,
+    notes: input.notes ?? null,
+    payment_preference: input.payment_preference,
+    status,
+    total_cents: 1_780,
+    currency: "EUR",
+    created_at: new Date("2026-08-22T10:00:00.000Z"),
+    updated_at: new Date("2026-08-22T10:00:00.000Z"),
+    items: []
+  };
+}
+
+function administrativeService(order: OrderEntity | null) {
+  const builder = {
+    orderBy: vi.fn(),
+    skip: vi.fn(),
+    take: vi.fn(),
+    andWhere: vi.fn(),
+    getManyAndCount: vi.fn()
+  };
+  for (const method of ["orderBy", "skip", "take", "andWhere"] as const) {
+    builder[method].mockReturnValue(builder);
+  }
+  builder.getManyAndCount.mockResolvedValue(order ? [[order], 2] : [[], 0]);
+
+  const orders = {
+    createQueryBuilder: vi.fn().mockReturnValue(builder),
+    findOne: vi.fn().mockResolvedValue(order)
+  } as unknown as Repository<OrderEntity>;
+  const transactionRepository = {
+    findOne: vi.fn().mockResolvedValue(order),
+    save: vi.fn().mockImplementation((value: OrderEntity) => Promise.resolve(value))
+  };
+  const manager = {
+    getRepository: vi.fn().mockReturnValue(transactionRepository)
+  } as unknown as EntityManager;
+  const dataSource = {
+    transaction: vi.fn(
+      (callback: (transactionManager: EntityManager) => Promise<unknown>) => callback(manager)
+    )
+  } as unknown as DataSource;
+
+  return {
+    service: new OrdersService(orders, dataSource),
+    builder,
+    transactionRepository
+  };
+}
+
 describe("OrdersService", () => {
   it("prices and snapshots the order from PostgreSQL inside one transaction", async () => {
     const { service, orderRepository, itemRepository } = transactionalService();
@@ -130,5 +189,44 @@ describe("OrdersService", () => {
     const { service } = transactionalService({ requires_quote: true });
 
     await expect(service.create(input)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it("lists and searches orders with stable pagination metadata", async () => {
+    const { service, builder } = administrativeService(existingOrder());
+
+    const result = await service.list({
+      status: "pending_whatsapp",
+      search: " Arta ",
+      limit: 1,
+      offset: 0
+    });
+
+    expect(builder.andWhere).toHaveBeenCalledTimes(2);
+    expect(result.meta).toEqual({ total: 2, limit: 1, offset: 0, has_more: true });
+    expect(result.data[0]).toMatchObject({ customer_name: "Arta Hoxha", items: [] });
+  });
+
+  it("returns order details and rejects missing order IDs", async () => {
+    const order = existingOrder();
+    await expect(administrativeService(order).service.getById(order.id))
+      .resolves.toMatchObject({ id: order.id });
+    await expect(administrativeService(null).service.getById(order.id))
+      .rejects.toMatchObject({ status: 404 });
+  });
+
+  it("enforces the order status transition graph", async () => {
+    const order = existingOrder();
+    const { service, transactionRepository } = administrativeService(order);
+
+    await expect(service.updateStatus(order.id, "confirmed"))
+      .resolves.toMatchObject({ status: "confirmed" });
+    await expect(service.updateStatus(order.id, "confirmed"))
+      .resolves.toMatchObject({ status: "confirmed" });
+    await expect(service.updateStatus(order.id, "pending_whatsapp"))
+      .rejects.toBeInstanceOf(ConflictException);
+    expect(transactionRepository.save).toHaveBeenCalledOnce();
+
+    await expect(administrativeService(null).service.updateStatus(order.id, "confirmed"))
+      .rejects.toMatchObject({ status: 404 });
   });
 });

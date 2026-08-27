@@ -16,11 +16,11 @@ export function PosterFrame({
   className
 }: {
   children: React.ReactNode;
-  rail: React.ReactNode;
+  rail?: React.ReactNode;
   className?: string;
 }) {
   return (
-    <div className={cn("poster-frame", className)}>
+    <div className={cn("poster-frame", !rail && "poster-frame--without-rail", className)}>
       <div className="min-w-0">{children}</div>
       {rail}
     </div>

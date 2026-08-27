@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
-import { ContextRail, PageIntro, PosterFrame } from "@/components/poster";
+import { PageIntro, PosterFrame } from "@/components/poster";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field, Input, Textarea } from "@/components/ui/form";
 import { useCart } from "@/context/cart-context";
@@ -24,13 +24,6 @@ const checkoutSchema = z.object({
 
 type CheckoutValues = z.infer<typeof checkoutSchema>;
 
-const checkoutSteps = [
-  { number: "01", label: "Shporta" },
-  { number: "02", label: "Të dhënat", active: true },
-  { number: "03", label: "Pagesa" },
-  { number: "04", label: "WhatsApp" }
-];
-
 export function CheckoutPage() {
   const { items, subtotal, clearCart } = useCart();
   const [submitting, setSubmitting] = useState(false);
@@ -40,8 +33,6 @@ export function CheckoutPage() {
     resolver: zodResolver(checkoutSchema),
     defaultValues: { payment_preference: "cash" }
   });
-  const rail = <ContextRail items={checkoutSteps} footer="Porosi · Konfirmim · Dorëzim" />;
-
   async function onSubmit(values: CheckoutValues) {
     setSubmitting(true);
     setError(null);
@@ -64,7 +55,7 @@ export function CheckoutPage() {
 
   if (items.length === 0) {
     return (
-      <PosterFrame rail={rail}>
+      <PosterFrame>
         <div className="poster-page min-h-dvh">
           <PageIntro title="Përfundo porosinë" />
           <EmptyState icon={ShoppingCart} title="Nuk ka produkte për porosi" description="Shto produkte në shportë para se të krijosh porosinë." action={<button className="poster-cta" type="button" onClick={() => navigate("/produkte")}>Shiko produktet</button>} />
@@ -74,7 +65,7 @@ export function CheckoutPage() {
   }
 
   return (
-    <PosterFrame rail={rail}>
+    <PosterFrame>
       <div className="checkout-page poster-page">
         <PageIntro title={<>Përfundo<br />porosinë</>} aside={<img src="/design/quality-stamp.png" alt="Pastërti profesionale" />} />
         <div className="checkout-meta"><Link to="/shporta"><ArrowLeft aria-hidden="true" />Kthehu te shporta</Link><strong>{items.length} artikuj</strong></div>

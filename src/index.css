@@ -84,6 +84,8 @@
 .mobile-header, .mobile-menu { display: none; }
 
 .poster-frame { min-height: 100dvh; display: grid; grid-template-columns: minmax(0, 1fr) 190px; }
+.poster-frame.poster-frame--without-rail { grid-template-columns: minmax(0, 1fr); }
+.poster-frame--without-rail .poster-title { width: calc(100% / 1.12); }
 .context-rail { position: sticky; top: 0; align-self: start; min-width: 0; width: 100%; height: 100dvh; min-height: 100dvh; display: flex; flex-direction: column; overflow: hidden; border-left: 1px solid var(--poster-blue); background: rgba(255,255,255,.28); }
 .context-rail > .locator-bar { margin: 104px 36px 60px; }
 .locator-bar { display: block; width: 52px; height: 7px; background: var(--poster-citron); }
@@ -351,6 +353,7 @@
   .page-intro { min-height: 112px; grid-template-columns: 1fr; }
   .page-intro__aside { display: none; }
   .poster-title { margin-top: 18px; font-size: 53px; transform: scaleX(1.02); }
+  .poster-frame--without-rail .poster-title { width: calc(100% / 1.02); }
   .poster-eyebrow { font-size: 10px; }
   .poster-eyebrow > span { width: 30px; }
   .home-poster { grid-template-rows: minmax(800px, auto) auto; }

@@ -1,24 +1,16 @@
 import { ArrowRight, Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { ContextRail, PageIntro, PosterFrame } from "@/components/poster";
+import { PageIntro, PosterFrame } from "@/components/poster";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useCart } from "@/context/cart-context";
 import { formatCurrency } from "@/lib/format";
 
-const checkoutSteps = [
-  { number: "01", label: "Shporta", active: true },
-  { number: "02", label: "Të dhënat" },
-  { number: "03", label: "Pagesa" },
-  { number: "04", label: "WhatsApp" }
-];
-
 export function CartPage() {
   const { items, count, subtotal, updateQuantity, removeItem } = useCart();
-  const rail = <ContextRail items={checkoutSteps} footer="Porosi · Konfirmim · Dorëzim" />;
 
   if (items.length === 0) {
     return (
-      <PosterFrame rail={rail}>
+      <PosterFrame>
         <div className="poster-page min-h-dvh">
           <PageIntro title="Shporta" />
           <EmptyState icon={ShoppingCart} title="Shporta është bosh" description="Shfleto katalogun dhe shto produktet që i duhen biznesit tënd." action={<Link className="poster-cta" to="/produkte">Shiko produktet<ArrowRight aria-hidden="true" /></Link>} />
@@ -28,7 +20,7 @@ export function CartPage() {
   }
 
   return (
-    <PosterFrame rail={rail}>
+    <PosterFrame>
       <div className="cart-page poster-page">
         <PageIntro title="Shporta" aside={<p className="page-count">{count} artikuj</p>} />
 

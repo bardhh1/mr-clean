@@ -10,6 +10,7 @@ const navItems = [
   { href: "/produkte", label: "Produktet", icon: SprayCan },
   { href: "/shporta", label: "Shporta", icon: ShoppingCart }
 ];
+const mobileNavItems = navItems.filter((item) => item.href !== "/shporta");
 
 export function Layout() {
   const [open, setOpen] = useState(false);
@@ -94,7 +95,7 @@ export function Layout() {
       {open ? (
         <div id="mobile-menu" className="mobile-menu">
           <nav aria-label="Navigimi mobil">
-            {navItems.map((item) => (
+            {mobileNavItems.map((item) => (
               <NavLink key={item.href} to={item.href} end={item.end} onClick={() => setOpen(false)}>
                 {item.label}<ArrowUpRight aria-hidden="true" />
               </NavLink>

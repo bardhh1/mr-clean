@@ -27,7 +27,7 @@ export function HomePage() {
           <h1 className="hero-title">Furnizim<br />sanitar<br />për<br />biznese.</h1>
 
           <div className="hero-products" aria-hidden="true">
-            <img src="/design/hero-products.png" alt="" fetchPriority="high" />
+            <img src="/design/hero-products-catalog.webp" alt="" fetchPriority="high" />
           </div>
         </div>
 

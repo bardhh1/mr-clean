@@ -452,6 +452,8 @@ export class AdminAuthService {
   }
 
   private hashSecret(secret: string): string {
+    // Refresh secrets are 384 random bits, never user-chosen passwords.
+    // codeql[js/insufficient-password-hash]
     return createHash("sha256").update(secret).digest("hex");
   }
 }

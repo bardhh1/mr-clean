@@ -53,7 +53,7 @@ Values are stored in Railway or Vercel and are not committed. The API has valida
 
 - Runtime, API prefix, port, and allowed Vercel origin.
 - Private PostgreSQL URL, SSL policy, and bounded pool.
-- Generated JWT signing secret and token lifetimes.
+- Generated JWT signing secret, issuer/audience, bounded token-family lifetimes, and owner lockout policy.
 - `Secure; SameSite=None` admin cookies for the Vercel-to-Railway boundary.
 - Railway Bucket endpoint, credentials, bucket name, region, and S3 URL style.
 
@@ -69,7 +69,7 @@ Every API deployment follows:
 4. Call `/api/v1/health/ready` until PostgreSQL reports `up`.
 5. Route traffic only after readiness succeeds.
 
-The three migrations create and seed the catalog, add revocable admin sessions, and add transactional orders. TypeORM records them in `mr_clean_migrations`; rerunning the command is safe.
+The migrations create and seed the catalog, add revocable admin sessions, add transactional orders, import the verified 52-product catalog, and harden the single-owner session boundary. TypeORM records them in `mr_clean_migrations`; rerunning the command is safe.
 
 ## Clean-build incidents and protections
 

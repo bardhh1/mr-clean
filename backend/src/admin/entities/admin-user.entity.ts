@@ -8,7 +8,7 @@ import {
 } from "typeorm";
 import { AdminSessionEntity } from "./admin-session.entity";
 
-export type AdminRole = "admin" | "editor";
+export type AdminRole = "admin";
 
 @Entity({ name: "admin_users" })
 export class AdminUserEntity {
@@ -26,6 +26,18 @@ export class AdminUserEntity {
 
   @Column({ type: "boolean", default: true })
   is_active!: boolean;
+
+  @Column({ type: "integer", default: 0 })
+  failed_login_count!: number;
+
+  @Column({ type: "timestamptz", nullable: true })
+  last_failed_login_at!: Date | null;
+
+  @Column({ type: "timestamptz", nullable: true })
+  locked_until!: Date | null;
+
+  @Column({ type: "timestamptz", default: () => "CURRENT_TIMESTAMP" })
+  password_changed_at!: Date;
 
   @Column({ type: "timestamptz", nullable: true })
   last_login_at!: Date | null;

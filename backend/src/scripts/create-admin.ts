@@ -1,5 +1,6 @@
 import dataSource from "../database/data-source";
 import { hashPassword } from "../admin/auth/password";
+import { AdminSessionEntity } from "../admin/entities/admin-session.entity";
 import { AdminUserEntity } from "../admin/entities/admin-user.entity";
 
 async function createAdmin(): Promise<void> {
@@ -15,17 +16,53 @@ async function createAdmin(): Promise<void> {
 
   await dataSource.initialize();
   try {
-    const repository = dataSource.getRepository(AdminUserEntity);
-    const existing = await repository.findOneBy({ email });
-    const user = existing ?? repository.create({
-      email,
-      role: "admin",
-      is_active: true,
-      last_login_at: null
+    await dataSource.transaction(async (manager) => {
+      const repository = manager.getRepository(AdminUserEntity);
+      const activeOwner = await repository.findOne({
+        where: { is_active: true },
+        lock: { mode: "pessimistic_write" }
+      });
+      if (activeOwner && activeOwner.email !== email) {
+        throw new Error(
+          `An active owner already exists (${activeOwner.email}); deactivate it explicitly before replacing the identity`
+        );
+      }
+
+      const existing = activeOwner?.email === email
+        ? activeOwner
+        : await repository.findOne({
+          where: { email },
+          lock: { mode: "pessimistic_write" }
+        });
+
+      const now = new Date();
+      const user = existing ?? repository.create({
+        email,
+        role: "admin",
+        is_active: true,
+        failed_login_count: 0,
+        last_failed_login_at: null,
+        locked_until: null,
+        password_changed_at: now,
+        last_login_at: null
+      });
+      user.password_hash = hashPassword(password);
+      user.role = "admin";
+      user.is_active = true;
+      user.failed_login_count = 0;
+      user.last_failed_login_at = null;
+      user.locked_until = null;
+      user.password_changed_at = now;
+      const saved = await repository.save(user);
+
+      await manager.getRepository(AdminSessionEntity)
+        .createQueryBuilder()
+        .update(AdminSessionEntity)
+        .set({ revoked_at: now, revocation_reason: "password_changed" })
+        .where("admin_user_id = :adminUserId", { adminUserId: saved.id })
+        .andWhere("revoked_at IS NULL")
+        .execute();
     });
-    user.password_hash = hashPassword(password);
-    user.is_active = true;
-    await repository.save(user);
     console.log(`Admin account is ready: ${email}`);
   } finally {
     await dataSource.destroy();

@@ -42,6 +42,21 @@ export class AdminUserEntity {
   @Column({ type: "timestamptz", nullable: true })
   last_login_at!: Date | null;
 
+  @Column({ type: "boolean", default: false })
+  mfa_enabled!: boolean;
+
+  @Column({ type: "text", nullable: true })
+  mfa_secret_ciphertext!: string | null;
+
+  @Column({ type: "timestamptz", nullable: true })
+  mfa_enrolled_at!: Date | null;
+
+  @Column({ type: "bigint", nullable: true, transformer: {
+    to: (value: number | null) => value,
+    from: (value: string | null) => value === null ? null : Number(value)
+  } })
+  last_totp_counter!: number | null;
+
   @CreateDateColumn({ type: "timestamptz" })
   created_at!: Date;
 

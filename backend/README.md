@@ -25,6 +25,8 @@ Local development needs PostgreSQL plus S3-compatible credentials matching `.env
 - Administration: `/api/v1/admin/*`
 - Active admin sessions: `GET /api/v1/admin/auth/sessions`
 - Revoke all admin sessions: `POST /api/v1/admin/auth/logout-all`
+- Finish MFA enrollment or login: `POST /api/v1/admin/auth/mfa/verify`
+- Replace recovery codes after fresh TOTP: `POST /api/v1/admin/auth/mfa/recovery-codes`
 
 ## Commands
 
@@ -54,3 +56,4 @@ Every completed build phase has a detailed README under `docs/phases/`:
 6. Railway/Vercel production deployment and verification.
 7. Verified 52-product PDF catalog import and production release.
 8. Single-owner account, bounded session families, replay containment, and lockout.
+9. Mandatory authenticator MFA, one-time recovery, and MFA-backed sessions.

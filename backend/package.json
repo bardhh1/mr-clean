@@ -16,6 +16,7 @@
     "db:migrate": "typeorm migration:run -d dist/database/data-source.js",
     "db:migration:show": "typeorm migration:show -d dist/database/data-source.js",
     "admin:create": "node dist/scripts/create-admin.js",
+    "admin:mfa-reset": "node dist/scripts/reset-admin-mfa.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

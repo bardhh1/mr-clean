@@ -94,6 +94,8 @@ jobs:
       DATABASE_SSL: "false"
       DATABASE_POOL_MAX: 5
       JWT_ACCESS_SECRET: ci-only-signing-secret-not-used-outside-tests
+      MFA_ENCRYPTION_KEY: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY
+      MFA_RECOVERY_PEPPER: ci-only-recovery-pepper-that-is-longer-than-thirty-two-characters
       JWT_ACCESS_ISSUER: mr-clean-api
       JWT_ACCESS_AUDIENCE: mr-clean-admin
       JWT_ACCESS_TTL_SECONDS: 900

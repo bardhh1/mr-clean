@@ -54,11 +54,10 @@ export class AdminAuthController {
   @Post("logout")
   @HttpCode(204)
   @UseGuards(TrustedClientGuard)
-  @ApiOperation({ summary: "Revoke the current refresh session" })
+  @ApiOperation({ summary: "Revoke the current refresh-session family" })
   async logout(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
     await this.auth.logout(this.readCookie(request, refreshCookieName));
-    response.clearCookie(accessCookieName, this.cookieOptions("/"));
-    response.clearCookie(refreshCookieName, this.cookieOptions(this.refreshCookiePath()));
+    this.clearSessionCookies(response);
   }
 
   @Get("me")
@@ -67,6 +66,25 @@ export class AdminAuthController {
   @ApiOkResponse({ description: "The active admin principal." })
   me(@CurrentAdmin() admin: AdminPrincipal | undefined) {
     return { user: admin };
+  }
+
+  @Get("sessions")
+  @UseGuards(AdminAuthGuard, TrustedClientGuard)
+  @ApiOperation({ summary: "List active sessions for the single administrator" })
+  sessions(@CurrentAdmin() admin: AdminPrincipal) {
+    return this.auth.listSessions(admin.id, admin.session_id);
+  }
+
+  @Post("logout-all")
+  @HttpCode(204)
+  @UseGuards(AdminAuthGuard, TrustedClientGuard)
+  @ApiOperation({ summary: "Revoke every active administrator session" })
+  async logoutAll(
+    @CurrentAdmin() admin: AdminPrincipal,
+    @Res({ passthrough: true }) response: Response
+  ): Promise<void> {
+    await this.auth.logoutAll(admin.id);
+    this.clearSessionCookies(response);
   }
 
   private setSessionCookies(
@@ -105,5 +123,10 @@ export class AdminAuthController {
   private readCookie(request: Request, name: string): string | undefined {
     const cookies = request.cookies as Record<string, string | undefined> | undefined;
     return cookies?.[name];
+  }
+
+  private clearSessionCookies(response: Response): void {
+    response.clearCookie(accessCookieName, this.cookieOptions("/"));
+    response.clearCookie(refreshCookieName, this.cookieOptions(this.refreshCookiePath()));
   }
 }

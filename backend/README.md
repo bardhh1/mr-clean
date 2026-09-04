@@ -23,6 +23,8 @@ Local development needs PostgreSQL plus S3-compatible credentials matching `.env
 - Public catalog: `/api/v1/categories` and `/api/v1/products`
 - Checkout: `POST /api/v1/orders`
 - Administration: `/api/v1/admin/*`
+- Active admin sessions: `GET /api/v1/admin/auth/sessions`
+- Revoke all admin sessions: `POST /api/v1/admin/auth/logout-all`
 
 ## Commands
 
@@ -51,3 +53,4 @@ Every completed build phase has a detailed README under `docs/phases/`:
 5. Vercel frontend integration.
 6. Railway/Vercel production deployment and verification.
 7. Verified 52-product PDF catalog import and production release.
+8. Single-owner account, bounded session families, replay containment, and lockout.

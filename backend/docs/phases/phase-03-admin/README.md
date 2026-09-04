@@ -1,5 +1,7 @@
 # Phase 03 — Secure administration and Railway product storage
 
+> Phase 08 narrows this original multi-role model to one active administrator and adds bounded session families, refresh-reuse containment, and account lockout. Its security contract supersedes the role and refresh-session details below where they differ.
+
 ## Outcome
 
 This phase creates the private management boundary for Mr. Clean. Authorized staff can sign in, manage categories and products, and upload product photography to a private Railway Bucket. Public catalog responses translate stored object keys into short-lived signed URLs, so the bucket never needs anonymous access.

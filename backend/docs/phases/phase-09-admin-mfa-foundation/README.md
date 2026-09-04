@@ -224,6 +224,15 @@ A full schema rollback is permitted only before the dashboard contains meaningfu
 
 ## Verification
 
+### CI dependency-gate remediation
+
+The first branch CI run passed frontend/backend lint, builds, and backend unit coverage, then correctly stopped before E2E because both dependency-audit jobs found existing high-severity transitive advisories on the default branch. Phase 09 applies the exact lockfile-only Dependabot updates rather than weakening or bypassing the audit gate:
+
+- Frontend `browserslist` is resolved from `4.28.4` to `4.28.8`, including its compatible browser-data transitive updates. The release fixes prototype-write and unbounded-memory behavior in its query parser.
+- Backend `qs` is resolved from `6.15.3` to `6.16.0`. The release adds bounded stringify recursion and parser limit fixes.
+
+Neither application manifest changes its direct dependency contract. The full lint, test, coverage, build, audit, migration, and PostgreSQL E2E pipeline must pass again on the resulting lockfiles; the failed run is retained as evidence that the gate blocks vulnerable dependency snapshots.
+
 Unit coverage now exercises:
 
 - The RFC 6238 vector and six-digit truncation.

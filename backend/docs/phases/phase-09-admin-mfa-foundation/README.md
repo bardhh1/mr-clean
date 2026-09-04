@@ -230,6 +230,7 @@ The first branch CI run passed frontend/backend lint, builds, and backend unit c
 
 - Frontend `browserslist` is resolved from `4.28.4` to `4.28.8`, including its compatible browser-data transitive updates. The release fixes prototype-write and unbounded-memory behavior in its query parser.
 - Backend `qs` is resolved from `6.15.3` to `6.16.0`. The release adds bounded stringify recursion and parser limit fixes.
+- Backend development tooling's transitive `fast-uri` package is resolved from `3.1.5` to `3.1.7`. This clears the CI audit after new high-severity host-confusion and SSRF advisories were published for versions below `3.1.6`; the affected path is Nest CLI → Angular DevKit → AJV and is not shipped in the runtime image.
 
 Neither application manifest changes its direct dependency contract. The full lint, test, coverage, build, audit, migration, and PostgreSQL E2E pipeline must pass again on the resulting lockfiles; the failed run is retained as evidence that the gate blocks vulnerable dependency snapshots.
 

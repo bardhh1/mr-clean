@@ -3,8 +3,10 @@ import {
   Boxes,
   CheckCircle2,
   ClipboardList,
+  KeyRound,
   LogOut,
   ShieldAlert,
+  ShieldCheck,
   Tags
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -14,11 +16,13 @@ import {
   getSessionUser,
   signInAdmin,
   signOutAdmin,
+  verifyAdminMfa,
   updateProductStatus,
   uploadProductImage,
   upsertCategory,
   upsertProduct
 } from "@/lib/admin";
+import type { MfaChallenge } from "@/lib/admin";
 import { getAdminCategories, getAdminProducts } from "@/lib/catalog";
 import { formatCurrency } from "@/lib/format";
 import { getOrders, updateOrderStatus } from "@/lib/orders";
@@ -34,6 +38,15 @@ import { Select } from "@/components/ui/select";
 const loginSchema = z.object({
   email: z.string().email("Email nuk është valid."),
   password: z.string().min(12, "Fjalëkalimi duhet të ketë së paku 12 karaktere.")
+});
+
+const mfaSchema = z.object({
+  code: z.string()
+    .trim()
+    .regex(
+      /^(?:\d{6}|[A-Za-z2-7]{4}(?:-[A-Za-z2-7]{4}){3})$/,
+      "Shkruani kodin 6-shifror ose një kod rikuperimi."
+    )
 });
 
 const categorySchema = z.object({
@@ -57,6 +70,7 @@ const productSchema = z.object({
 });
 
 type LoginValues = z.infer<typeof loginSchema>;
+type MfaValues = z.infer<typeof mfaSchema>;
 type CategoryInput = z.input<typeof categorySchema>;
 type CategoryValues = z.output<typeof categorySchema>;
 type ProductInput = z.input<typeof productSchema>;
@@ -70,8 +84,11 @@ export function AdminPage() {
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mfaChallenge, setMfaChallenge] = useState<MfaChallenge | null>(null);
+  const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
 
   const loginForm = useForm<LoginValues>({ resolver: zodResolver(loginSchema) });
+  const mfaForm = useForm<MfaValues>({ resolver: zodResolver(mfaSchema) });
   const categoryForm = useForm<CategoryInput, unknown, CategoryValues>({
     resolver: zodResolver(categorySchema)
   });
@@ -131,11 +148,26 @@ export function AdminPage() {
   async function onLogin(values: LoginValues) {
     setError(null);
     try {
-      await signInAdmin(values.email, values.password);
-      setAuthenticated(true);
-      await refresh();
+      const challenge = await signInAdmin(values.email, values.password);
+      setMfaChallenge(challenge);
+      mfaForm.reset();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Kyçja dështoi.");
+    }
+  }
+
+  async function onMfa(values: MfaValues) {
+    if (!mfaChallenge) return;
+    setError(null);
+    try {
+      const result = await verifyAdminMfa(mfaChallenge.challengeToken, values.code);
+      setAuthenticated(Boolean(result.user));
+      setMfaChallenge(null);
+      setRecoveryCodes(result.recovery_codes ?? []);
+      mfaForm.reset();
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Verifikimi dështoi.");
     }
   }
 
@@ -201,6 +233,8 @@ export function AdminPage() {
     try {
       await signOutAdmin();
       setAuthenticated(false);
+      setMfaChallenge(null);
+      setRecoveryCodes([]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Dalja dështoi.");
     }
@@ -238,6 +272,84 @@ export function AdminPage() {
 
   if (loading) {
     return <section className="page-shell min-h-[64dvh]"><div className="surface h-96 animate-pulse bg-muted" /></section>;
+  }
+
+  if (authenticated && recoveryCodes.length > 0) {
+    return (
+      <section className="brand-ink flex min-h-[calc(100dvh-7rem)] items-center justify-center px-4 py-12">
+        <Card className="w-full max-w-xl border-white/10 shadow-lift">
+          <CardHeader>
+            <ShieldCheck className="mb-4 h-10 w-10 text-accent" aria-hidden="true" />
+            <CardTitle className="text-2xl">Ruani kodet e rikuperimit</CardTitle>
+            <CardDescription>
+              Këto kode shfaqen vetëm një herë. Ruajini jashtë këtij telefoni dhe mos i dërgoni me email.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-5">
+            <div className="grid grid-cols-2 gap-2 rounded-md border bg-background/80 p-4 font-mono text-sm sm:grid-cols-2">
+              {recoveryCodes.map((code) => <code key={code}>{code}</code>)}
+            </div>
+            <Button onClick={() => setRecoveryCodes([])}>I kam ruajtur kodet</Button>
+          </CardContent>
+        </Card>
+      </section>
+    );
+  }
+
+  if (!authenticated && mfaChallenge) {
+    const enrollment = mfaChallenge.mode === "enroll" && mfaChallenge.setup;
+    return (
+      <section className="brand-ink flex min-h-[calc(100dvh-7rem)] items-center justify-center px-4 py-12">
+        <Card className="w-full max-w-md border-white/10 shadow-lift">
+          <CardHeader>
+            <KeyRound className="mb-4 h-10 w-10 text-accent" aria-hidden="true" />
+            <CardTitle className="text-2xl">
+              {enrollment ? "Aktivizo verifikimin me dy hapa" : "Shkruaj kodin e sigurisë"}
+            </CardTitle>
+            <CardDescription>
+              {enrollment
+                ? "Shto llogarinë në aplikacionin authenticator, pastaj shkruaj kodin 6-shifror."
+                : "Përdor kodin nga authenticator-i ose një kod rikuperimi njëpërdorimësh."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-5">
+            {enrollment ? (
+              <div className="grid gap-3 rounded-md border bg-background/80 p-4 text-sm">
+                <p className="font-medium">Çelësi manual</p>
+                <code className="break-all rounded bg-muted p-3 font-mono tracking-wider">
+                  {mfaChallenge.setup?.secret}
+                </code>
+                <a className="font-semibold text-primary underline underline-offset-4" href={mfaChallenge.setup?.otpauthUri}>
+                  Hape në aplikacionin authenticator
+                </a>
+              </div>
+            ) : null}
+            <form className="grid gap-4" onSubmit={mfaForm.handleSubmit(onMfa)}>
+              <Field label="Kodi i sigurisë" error={mfaForm.formState.errors.code?.message}>
+                <Input
+                  autoComplete="one-time-code"
+                  inputMode="text"
+                  placeholder="123456 ose ABCD-EFGH-IJKL-MNPQ"
+                  {...mfaForm.register("code")}
+                />
+              </Field>
+              {error ? <p role="alert" className="text-sm font-medium text-destructive">{error}</p> : null}
+              <Button type="submit" size="lg" className="w-full">Verifiko dhe vazhdo</Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setMfaChallenge(null);
+                  setError(null);
+                }}
+              >
+                Fillo përsëri
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </section>
+    );
   }
 
   if (!authenticated) {

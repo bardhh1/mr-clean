@@ -12,7 +12,7 @@ export type AccessTokenPayload = {
   email: string;
   role: AdminRole;
   sid: string;
-  ver: 2;
+  ver: 3;
 };
 
 export type AdminSessionSummary = {
@@ -22,4 +22,16 @@ export type AdminSessionSummary = {
   last_used_at: Date | null;
   expires_at: Date;
   family_expires_at: Date;
+  mfa_verified_at: Date;
+};
+
+export type MfaLoginChallenge = {
+  status: "mfa_required";
+  mode: "enroll" | "verify";
+  challengeToken: string;
+  expiresInSeconds: number;
+  setup?: {
+    secret: string;
+    otpauthUri: string;
+  };
 };

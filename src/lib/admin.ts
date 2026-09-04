@@ -4,10 +4,25 @@ import { invalidateCatalogCache } from "@/lib/catalog";
 import type { Category, Product } from "@/lib/types";
 
 export async function signInAdmin(email: string, password: string) {
-  return apiRequest<{ user: AdminUser }>("/admin/auth/login", {
+  return apiRequest<MfaChallenge>("/admin/auth/login", {
     method: "POST",
     body: { email, password },
     retryAuth: false
+  });
+}
+
+export async function verifyAdminMfa(challengeToken: string, code: string) {
+  return apiRequest<MfaVerification>("/admin/auth/mfa/verify", {
+    method: "POST",
+    body: { challenge_token: challengeToken, code },
+    retryAuth: false
+  });
+}
+
+export async function regenerateAdminRecoveryCodes(code: string) {
+  return apiRequest<{ recoveryCodes: string[] }>("/admin/auth/mfa/recovery-codes", {
+    method: "POST",
+    body: { code }
   });
 }
 
@@ -103,10 +118,27 @@ export async function deleteProductImage(key: string): Promise<void> {
   });
 }
 
-type AdminUser = {
+export type AdminUser = {
   id: string;
   email: string;
   role: "admin";
+};
+
+export type MfaChallenge = {
+  status: "mfa_required";
+  mode: "enroll" | "verify";
+  challengeToken: string;
+  expiresInSeconds: number;
+  setup?: {
+    secret: string;
+    otpauthUri: string;
+  };
+};
+
+export type MfaVerification = {
+  user: AdminUser;
+  recovery_codes?: string[];
+  used_recovery_code: boolean;
 };
 
 export type UploadResult = {

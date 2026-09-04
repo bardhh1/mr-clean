@@ -49,6 +49,9 @@ export class AdminSessionEntity {
   @Column({ type: "timestamptz", nullable: true })
   last_used_at!: Date | null;
 
+  @Column({ type: "timestamptz", nullable: true })
+  mfa_verified_at!: Date | null;
+
   @CreateDateColumn({ type: "timestamptz" })
   created_at!: Date;
 
@@ -66,6 +69,8 @@ export const sessionRevocationReasons = [
   "reuse_detected",
   "expired",
   "password_changed",
+  "mfa_enrollment_required",
+  "mfa_reset",
   "owner_disabled"
 ] as const;
 

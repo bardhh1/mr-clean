@@ -26,6 +26,11 @@ const configuration: Record<keyof AppEnvironment, AppEnvironment[keyof AppEnviro
   REFRESH_TOKEN_ABSOLUTE_TTL_DAYS: 30,
   ADMIN_MAX_FAILED_LOGINS: 3,
   ADMIN_LOCKOUT_MINUTES: 15,
+  MFA_ENCRYPTION_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY",
+  MFA_RECOVERY_PEPPER: "a-test-recovery-pepper-that-is-at-least-32-characters",
+  MFA_ISSUER: "Mr. Clean Admin",
+  MFA_CHALLENGE_TTL_SECONDS: 300,
+  MFA_MAX_ATTEMPTS: 5,
   AUTH_COOKIE_SECURE: false,
   AUTH_COOKIE_SAME_SITE: "lax",
   AWS_ENDPOINT_URL: "https://storage.invalid",
@@ -123,6 +128,13 @@ class AuthFixture {
     );
   }
 
+  async login(service: AdminAuthService, email: string, password: string) {
+    const user = await service.verifyCredentials(email, password);
+    return this.dataSource.transaction((manager) =>
+      service.createAuthenticatedSession(manager, user, new Date())
+    );
+  }
+
   owner(password = "a-very-long-owner-password"): AdminUserEntity {
     const user = Object.assign(new AdminUserEntity(), {
       id: randomUUID(),
@@ -135,6 +147,10 @@ class AuthFixture {
       locked_until: null,
       password_changed_at: new Date(),
       last_login_at: null,
+      mfa_enabled: true,
+      mfa_secret_ciphertext: "test-only-encrypted-secret",
+      mfa_enrolled_at: new Date(),
+      last_totp_counter: null,
       created_at: new Date(),
       updated_at: new Date()
     });
@@ -201,7 +217,7 @@ describe("AdminAuthService", () => {
 
   it("creates a bounded session family and a versioned access token", async () => {
     const owner = fixture.owner();
-    const result = await service.login(owner.email, "a-very-long-owner-password");
+    const result = await fixture.login(service, owner.email, "a-very-long-owner-password");
 
     expect(fixture.sessions).toHaveLength(1);
     const session = fixture.sessions[0];
@@ -219,7 +235,7 @@ describe("AdminAuthService", () => {
       sub: owner.id,
       sid: session.id,
       role: "admin",
-      ver: 2
+      ver: 3
     });
   });
 
@@ -227,13 +243,13 @@ describe("AdminAuthService", () => {
     const owner = fixture.owner();
 
     for (let attempt = 0; attempt < 3; attempt += 1) {
-      await expect(service.login(owner.email, "incorrect-password"))
+      await expect(fixture.login(service, owner.email, "incorrect-password"))
         .rejects.toBeInstanceOf(UnauthorizedException);
     }
 
     expect(owner.failed_login_count).toBe(3);
     expect(owner.locked_until?.getTime()).toBeGreaterThan(Date.now());
-    await expect(service.login(owner.email, "a-very-long-owner-password"))
+    await expect(fixture.login(service, owner.email, "a-very-long-owner-password"))
       .rejects.toBeInstanceOf(UnauthorizedException);
     expect(fixture.sessions).toHaveLength(0);
   });
@@ -242,13 +258,13 @@ describe("AdminAuthService", () => {
     const owner = fixture.owner();
 
     for (let attempt = 0; attempt < 3; attempt += 1) {
-      await expect(service.login(owner.email, "incorrect-password"))
+      await expect(fixture.login(service, owner.email, "incorrect-password"))
         .rejects.toBeInstanceOf(UnauthorizedException);
     }
     const deadline = owner.locked_until?.getTime();
     const failures = owner.failed_login_count;
 
-    await expect(service.login(owner.email, "another-incorrect-password"))
+    await expect(fixture.login(service, owner.email, "another-incorrect-password"))
       .rejects.toBeInstanceOf(UnauthorizedException);
 
     expect(owner.locked_until?.getTime()).toBe(deadline);
@@ -257,7 +273,7 @@ describe("AdminAuthService", () => {
 
   it("rotates refresh sessions without extending the absolute family lifetime", async () => {
     const owner = fixture.owner();
-    const login = await service.login(owner.email, "a-very-long-owner-password");
+    const login = await fixture.login(service, owner.email, "a-very-long-owner-password");
     const first = fixture.sessions[0];
 
     const refreshed = await service.refresh(login.refreshToken);
@@ -273,7 +289,7 @@ describe("AdminAuthService", () => {
 
   it("revokes the full family when a rotated refresh token is replayed", async () => {
     const owner = fixture.owner();
-    const login = await service.login(owner.email, "a-very-long-owner-password");
+    const login = await fixture.login(service, owner.email, "a-very-long-owner-password");
     await service.refresh(login.refreshToken);
 
     await expect(service.refresh(login.refreshToken)).rejects.toThrow("reuse was detected");
@@ -285,7 +301,7 @@ describe("AdminAuthService", () => {
 
   it("serializes refresh on the owner before the session row", async () => {
     const owner = fixture.owner();
-    const login = await service.login(owner.email, "a-very-long-owner-password");
+    const login = await fixture.login(service, owner.email, "a-very-long-owner-password");
     fixture.lockEvents.length = 0;
 
     await service.refresh(login.refreshToken);
@@ -295,7 +311,7 @@ describe("AdminAuthService", () => {
 
   it("revokes the active family descendant when logout receives a rotated parent", async () => {
     const owner = fixture.owner();
-    const login = await service.login(owner.email, "a-very-long-owner-password");
+    const login = await fixture.login(service, owner.email, "a-very-long-owner-password");
     const refreshed = await service.refresh(login.refreshToken);
     const [parent, child] = fixture.sessions;
 
@@ -311,7 +327,7 @@ describe("AdminAuthService", () => {
     await expect(service.logout("not-a-refresh-token")).resolves.toBeUndefined();
 
     const owner = fixture.owner();
-    const login = await service.login(owner.email, "a-very-long-owner-password");
+    const login = await fixture.login(service, owner.email, "a-very-long-owner-password");
     vi.spyOn(fixture.dataSource, "transaction")
       .mockRejectedValueOnce(new Error("database unavailable"));
 
@@ -321,7 +337,7 @@ describe("AdminAuthService", () => {
 
   it("rejects legacy access tokens without the current token version", async () => {
     const owner = fixture.owner();
-    const login = await service.login(owner.email, "a-very-long-owner-password");
+    const login = await fixture.login(service, owner.email, "a-very-long-owner-password");
     const session = fixture.sessions[0];
     const legacy = fixture.jwt.sign({
       sub: owner.id,
@@ -344,8 +360,8 @@ describe("AdminAuthService", () => {
 
   it("revokes every active session with logout-all", async () => {
     const owner = fixture.owner();
-    await service.login(owner.email, "a-very-long-owner-password");
-    await service.login(owner.email, "a-very-long-owner-password");
+    await fixture.login(service, owner.email, "a-very-long-owner-password");
+    await fixture.login(service, owner.email, "a-very-long-owner-password");
 
     await service.logoutAll(owner.id);
 
@@ -356,7 +372,7 @@ describe("AdminAuthService", () => {
 
   it("serializes logout-all on the owner row", async () => {
     const owner = fixture.owner();
-    await service.login(owner.email, "a-very-long-owner-password");
+    await fixture.login(service, owner.email, "a-very-long-owner-password");
     fixture.lockEvents.length = 0;
 
     await service.logoutAll(owner.id);

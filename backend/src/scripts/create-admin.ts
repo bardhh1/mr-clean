@@ -44,7 +44,11 @@ async function createAdmin(): Promise<void> {
         last_failed_login_at: null,
         locked_until: null,
         password_changed_at: now,
-        last_login_at: null
+        last_login_at: null,
+        mfa_enabled: false,
+        mfa_secret_ciphertext: null,
+        mfa_enrolled_at: null,
+        last_totp_counter: null
       });
       user.password_hash = hashPassword(password);
       user.role = "admin";

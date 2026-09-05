@@ -55,6 +55,10 @@ No product image, catalog data, API response, or database row was changed in thi
 
 ## Release-gate dependency remediation
 
-The clean frontend branch starts from production `main`, whose lockfile still resolved `browserslist` `4.28.4`. The protected CI audit now reports high-severity unbounded-memory and prototype-write advisories for that version. The branch therefore also carries Dependabot's lockfile-only resolution to `4.28.8`, which had already passed the complete CI and CodeQL workflows on the MFA branch.
+The clean frontend branch starts from production `main`, whose lockfiles still resolved three transitive packages now blocked by the repository-wide audit gates:
 
-This does not change any direct dependency declaration or application behavior. It keeps the security gate intact and prevents an unrelated vulnerable development dependency snapshot from blocking the isolated visual correction.
+- frontend `browserslist` `4.28.4`, affected by high-severity unbounded-memory and prototype-write advisories, is resolved to `4.28.8` through Dependabot's lockfile-only patch;
+- backend `qs` `6.15.3` is resolved to `6.16.0` through Dependabot's lockfile-only parser and recursion-limit patch;
+- backend development tooling's `fast-uri` `3.1.5` is resolved to `3.1.7`, clearing the host-confusion and SSRF advisories affecting versions below `3.1.6`.
+
+These exact dependency resolutions had already passed the complete CI and CodeQL workflows on the MFA branch. They do not change a direct dependency declaration or application behavior. Including them keeps every security gate intact and allows the isolated visual correction to pass the same repository-wide frontend and backend checks required of every production change.

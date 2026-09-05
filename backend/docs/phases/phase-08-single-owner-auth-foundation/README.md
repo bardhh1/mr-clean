@@ -178,6 +178,16 @@ If a full schema rollback is explicitly required:
 
 ## Verification
 
+### Production checkpoint before Phase 09
+
+On 5 September 2026, the Railway production boundary was probed again before advancing the MFA branch:
+
+- `GET /api/v1/health/ready` returned `200` with `status: ready` and `dependencies.database: up`.
+- Unauthenticated `GET /api/v1/admin/auth/sessions` returned the expected `401 Admin authentication is required` response rather than `404`.
+- Unauthenticated `POST /api/v1/admin/auth/logout-all` returned the same expected `401` response rather than `404`.
+
+This confirms that production is healthy and exposes the Phase 08 route boundary. It does **not** by itself prove the owner-authenticated session lifecycle or inspect the exact database migration state: both routes reject the request before an unauthenticated caller can exercise that behavior. Before Phase 09 is deployed, the owner must still complete the authenticated sign-in, refresh, session-list, logout-all, and re-login checks from the deployment sequence above.
+
 Unit coverage exercises:
 
 - Versioned JWT creation and validation.

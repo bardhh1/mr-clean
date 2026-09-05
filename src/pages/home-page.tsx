@@ -70,7 +70,7 @@ export function HomePage() {
 
         <div className="category-index__list">
           {categoryProducts.map(({ category, product }, index) => (
-            <Link key={category.id} to={`/produkte?category=${category.slug}`} className="category-row">
+            <Link key={category.id} to={`/produkte?category=${category.slug}`} className="category-row" data-category={category.slug}>
               <span className="category-row__number">{String(index + 1).padStart(2, "0")}</span>
               <span className="category-row__image">{product ? <img src={product.image_urls[0]} alt="" /> : null}</span>
               <span className="category-row__content"><strong>{category.name}</strong><small>{category.description}</small></span>

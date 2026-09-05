@@ -37,11 +37,19 @@ The resulting contracts are:
 
 The image box deliberately leaves breathing room around the artwork. The bitmap remains undistorted because `object-fit: contain` scales the visible product within that box.
 
+### Portrait-product optical correction
+
+Uniform boxes prevent overflow, but equal boxes do not always produce equal visual weight. The `370 × 600px` Lavanderi pack is substantially taller and narrower than the surrounding product silhouettes, so it receives a category-specific optical box of `72 × 88px` on desktop, `64 × 82px` at the intermediate breakpoint, and `48 × 64px` on mobile. The category slug is exposed as a non-sensitive `data-category` styling hook; the product data and image remain unchanged.
+
+This second constraint keeps the full package visible while adding noticeably more space above, below, and beside it. It is intentionally limited to `lavanderi`, so landscape paper products, square aroma products, and wider chemical containers retain the shared sizing contract.
+
 ## Verification
 
 The fix was first evaluated against the seven-category production dataset by applying the exact final CSS in an isolated browser session. Every image remained fully inside its frame at `390`, `602`, `768`, `1020`, `1280`, and `1512px` viewport widths.
 
-At the reported mobile layout, all seven images measured `60 × 76px` inside `72 × 88px` frames, producing a consistent `6px` inset on every edge. A full visual screenshot confirmed the Lavanderi artwork no longer intersects either row divider and remains legible alongside the category copy.
+At the reported `602 × 863px` mobile layout, the six standard images measured `60 × 76px` inside `72 × 88px` frames. Lavanderi measured `48 × 64px`, leaving `12px` of space on every edge. A full visual screenshot confirmed the complete pack no longer approaches either row divider and remains legible alongside the category copy.
+
+The same browser-backed geometry check was repeated at the intermediate and desktop layouts. At `900px`, Lavanderi measured `64 × 82px` inside a `92 × 118px` frame (`14px` horizontal and `18px` vertical inset). At `1512px`, it measured `72 × 88px` inside a `112 × 118px` frame (`20px` horizontal and `15px` vertical inset). Every category image was fully contained at all three layouts.
 
 The repository checks also passed:
 

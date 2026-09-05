@@ -52,3 +52,9 @@ The repository checks also passed:
 - responsive DOM geometry checks for every category at all six viewport widths.
 
 No product image, catalog data, API response, or database row was changed in this phase.
+
+## Release-gate dependency remediation
+
+The clean frontend branch starts from production `main`, whose lockfile still resolved `browserslist` `4.28.4`. The protected CI audit now reports high-severity unbounded-memory and prototype-write advisories for that version. The branch therefore also carries Dependabot's lockfile-only resolution to `4.28.8`, which had already passed the complete CI and CodeQL workflows on the MFA branch.
+
+This does not change any direct dependency declaration or application behavior. It keeps the security gate intact and prevents an unrelated vulnerable development dependency snapshot from blocking the isolated visual correction.

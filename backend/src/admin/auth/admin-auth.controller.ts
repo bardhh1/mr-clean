@@ -20,7 +20,7 @@ import { AdminMfaService } from "./admin-mfa.service";
 import { accessCookieName, refreshCookieName } from "./auth.constants";
 import { CurrentAdmin } from "./current-admin.decorator";
 import { LoginDto } from "./dto/login.dto";
-import { MfaRecoveryCodesDto, MfaVerifyDto } from "./dto/mfa-verify.dto";
+import { MfaBootstrapDto, MfaRecoveryCodesDto, MfaVerifyDto } from "./dto/mfa-verify.dto";
 import { TrustedClientGuard } from "./trusted-client.guard";
 import type { AdminPrincipal } from "./auth.types";
 
@@ -43,6 +43,16 @@ export class AdminAuthController {
     const user = await this.auth.verifyCredentials(input.email, input.password);
     this.clearSessionCookies(response);
     return this.mfa.begin(user);
+  }
+
+  @Post("mfa/bootstrap")
+  @HttpCode(200)
+  @Header("Cache-Control", "no-store")
+  @UseGuards(TrustedClientGuard)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({ summary: "Authorize first-time MFA enrollment with an operator token" })
+  bootstrapMfa(@Body() input: MfaBootstrapDto) {
+    return this.mfa.bootstrap(input.challenge_token, input.bootstrap_token);
   }
 
   @Post("mfa/verify")

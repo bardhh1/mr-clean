@@ -1,6 +1,19 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { IsString, Matches, MaxLength, MinLength } from "class-validator";
 
+export class MfaBootstrapDto {
+  @ApiProperty({ description: "Opaque, short-lived challenge returned by the password step." })
+  @IsString()
+  @MinLength(64)
+  @MaxLength(180)
+  challenge_token!: string;
+
+  @ApiProperty({ description: "Operator-issued, one-time 256-bit Base64URL bootstrap token." })
+  @IsString()
+  @Matches(/^[A-Za-z0-9_-]{43}$/)
+  bootstrap_token!: string;
+}
+
 export class MfaVerifyDto {
   @ApiProperty({ description: "Opaque, short-lived challenge returned by the password step." })
   @IsString()

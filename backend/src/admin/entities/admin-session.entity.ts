@@ -70,6 +70,7 @@ export const sessionRevocationReasons = [
   "expired",
   "password_changed",
   "mfa_enrollment_required",
+  "mfa_bootstrap_issued",
   "mfa_reset",
   "owner_disabled"
 ] as const;

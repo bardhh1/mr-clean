@@ -26,11 +26,14 @@ const configuration: Record<keyof AppEnvironment, AppEnvironment[keyof AppEnviro
   REFRESH_TOKEN_ABSOLUTE_TTL_DAYS: 30,
   ADMIN_MAX_FAILED_LOGINS: 3,
   ADMIN_LOCKOUT_MINUTES: 15,
+  ADMIN_LOGIN_MIN_DURATION_MS: 0,
   MFA_ENCRYPTION_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY",
-  MFA_RECOVERY_PEPPER: "a-test-recovery-pepper-that-is-at-least-32-characters",
+  MFA_RECOVERY_PEPPER: "cmVjb3ZlcnktcGVwcGVyLXRlc3QtdmFsdWUtMzIhISE",
   MFA_ISSUER: "Mr. Clean Admin",
   MFA_CHALLENGE_TTL_SECONDS: 300,
   MFA_MAX_ATTEMPTS: 5,
+  MFA_MAX_ACTIVE_CHALLENGES: 3,
+  MFA_BOOTSTRAP_TTL_MINUTES: 15,
   AUTH_COOKIE_SECURE: false,
   AUTH_COOKIE_SAME_SITE: "lax",
   AWS_ENDPOINT_URL: "https://storage.invalid",
@@ -151,6 +154,8 @@ class AuthFixture {
       mfa_secret_ciphertext: "test-only-encrypted-secret",
       mfa_enrolled_at: new Date(),
       last_totp_counter: null,
+      mfa_bootstrap_token_hash: null,
+      mfa_bootstrap_expires_at: null,
       created_at: new Date(),
       updated_at: new Date()
     });
@@ -252,6 +257,24 @@ describe("AdminAuthService", () => {
     await expect(fixture.login(service, owner.email, "a-very-long-owner-password"))
       .rejects.toBeInstanceOf(UnauthorizedException);
     expect(fixture.sessions).toHaveLength(0);
+  });
+
+  it("pads both unknown-account and wrong-password failures to the configured duration", async () => {
+    const owner = fixture.owner();
+    configuration.ADMIN_LOGIN_MIN_DURATION_MS = 100;
+    try {
+      const unknownStartedAt = Date.now();
+      await expect(service.verifyCredentials("unknown@example.com", "incorrect-password"))
+        .rejects.toBeInstanceOf(UnauthorizedException);
+      expect(Date.now() - unknownStartedAt).toBeGreaterThanOrEqual(95);
+
+      const wrongPasswordStartedAt = Date.now();
+      await expect(service.verifyCredentials(owner.email, "incorrect-password"))
+        .rejects.toBeInstanceOf(UnauthorizedException);
+      expect(Date.now() - wrongPasswordStartedAt).toBeGreaterThanOrEqual(95);
+    } finally {
+      configuration.ADMIN_LOGIN_MIN_DURATION_MS = 0;
+    }
   });
 
   it("does not extend an account lock while the lock is active", async () => {

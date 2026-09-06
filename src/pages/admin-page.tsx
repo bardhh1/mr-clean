@@ -13,7 +13,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
+  authorizeAdminMfaEnrollment,
   getSessionUser,
+  regenerateAdminRecoveryCodes,
   signInAdmin,
   signOutAdmin,
   verifyAdminMfa,
@@ -49,6 +51,16 @@ const mfaSchema = z.object({
     )
 });
 
+const bootstrapSchema = z.object({
+  token: z.string()
+    .trim()
+    .regex(/^[A-Za-z0-9_-]{43}$/, "Shkruani tokenin njëpërdorimësh të operatorit.")
+});
+
+const recoveryRegenerationSchema = z.object({
+  code: z.string().trim().regex(/^\d{6}$/, "Shkruani kodin aktual 6-shifror.")
+});
+
 const categorySchema = z.object({
   name: z.string().min(2, "Shkruani emrin e kategorisë."),
   description: z.string().optional(),
@@ -71,6 +83,8 @@ const productSchema = z.object({
 
 type LoginValues = z.infer<typeof loginSchema>;
 type MfaValues = z.infer<typeof mfaSchema>;
+type BootstrapValues = z.infer<typeof bootstrapSchema>;
+type RecoveryRegenerationValues = z.infer<typeof recoveryRegenerationSchema>;
 type CategoryInput = z.input<typeof categorySchema>;
 type CategoryValues = z.output<typeof categorySchema>;
 type ProductInput = z.input<typeof productSchema>;
@@ -86,9 +100,15 @@ export function AdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [mfaChallenge, setMfaChallenge] = useState<MfaChallenge | null>(null);
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
+  const [recoveryCodesAcknowledged, setRecoveryCodesAcknowledged] = useState(false);
+  const [recoveryCodeUsed, setRecoveryCodeUsed] = useState(false);
 
   const loginForm = useForm<LoginValues>({ resolver: zodResolver(loginSchema) });
   const mfaForm = useForm<MfaValues>({ resolver: zodResolver(mfaSchema) });
+  const bootstrapForm = useForm<BootstrapValues>({ resolver: zodResolver(bootstrapSchema) });
+  const recoveryRegenerationForm = useForm<RecoveryRegenerationValues>({
+    resolver: zodResolver(recoveryRegenerationSchema)
+  });
   const categoryForm = useForm<CategoryInput, unknown, CategoryValues>({
     resolver: zodResolver(categorySchema)
   });
@@ -164,10 +184,42 @@ export function AdminPage() {
       setAuthenticated(Boolean(result.user));
       setMfaChallenge(null);
       setRecoveryCodes(result.recovery_codes ?? []);
+      setRecoveryCodesAcknowledged(false);
+      setRecoveryCodeUsed(result.used_recovery_code);
       mfaForm.reset();
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Verifikimi dështoi.");
+    }
+  }
+
+  async function onBootstrap(values: BootstrapValues) {
+    if (!mfaChallenge || mfaChallenge.mode !== "bootstrap") return;
+    setError(null);
+    try {
+      const enrollment = await authorizeAdminMfaEnrollment(
+        mfaChallenge.challengeToken,
+        values.token
+      );
+      setMfaChallenge(enrollment);
+      bootstrapForm.reset();
+      mfaForm.reset();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Autorizimi i regjistrimit dështoi.");
+    }
+  }
+
+  async function onRegenerateRecoveryCodes(values: RecoveryRegenerationValues) {
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await regenerateAdminRecoveryCodes(values.code);
+      setRecoveryCodes(result.recoveryCodes);
+      setRecoveryCodesAcknowledged(false);
+      setRecoveryCodeUsed(false);
+      recoveryRegenerationForm.reset();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Kodet e rikuperimit nuk u gjeneruan.");
     }
   }
 
@@ -235,6 +287,8 @@ export function AdminPage() {
       setAuthenticated(false);
       setMfaChallenge(null);
       setRecoveryCodes([]);
+      setRecoveryCodesAcknowledged(false);
+      setRecoveryCodeUsed(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Dalja dështoi.");
     }
@@ -286,10 +340,24 @@ export function AdminPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-5">
-            <div className="grid grid-cols-2 gap-2 rounded-md border bg-background/80 p-4 font-mono text-sm sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2 rounded-md border bg-background/80 p-4 font-mono text-sm sm:grid-cols-2">
               {recoveryCodes.map((code) => <code key={code}>{code}</code>)}
             </div>
-            <Button onClick={() => setRecoveryCodes([])}>I kam ruajtur kodet</Button>
+            <label className="flex items-start gap-3 text-sm font-medium">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-5 w-5 shrink-0"
+                checked={recoveryCodesAcknowledged}
+                onChange={(event) => setRecoveryCodesAcknowledged(event.target.checked)}
+              />
+              I kam ruajtur të gjitha kodet jashtë kësaj pajisjeje.
+            </label>
+            <Button
+              disabled={!recoveryCodesAcknowledged}
+              onClick={() => setRecoveryCodes([])}
+            >
+              Vazhdo në administratë
+            </Button>
           </CardContent>
         </Card>
       </section>
@@ -297,6 +365,57 @@ export function AdminPage() {
   }
 
   if (!authenticated && mfaChallenge) {
+    if (mfaChallenge.mode === "bootstrap") {
+      return (
+        <section className="brand-ink flex min-h-[calc(100dvh-7rem)] items-center justify-center px-4 py-12">
+          <Card className="w-full max-w-md border-white/10 shadow-lift">
+            <CardHeader>
+              <ShieldCheck className="mb-4 h-10 w-10 text-accent" aria-hidden="true" />
+              <CardTitle className="text-2xl">Autorizo aktivizimin e MFA-së</CardTitle>
+              <CardDescription>
+                Shkruaj tokenin njëpërdorimësh të krijuar në mjedisin e sigurt të Railway.
+                Fjalëkalimi vetëm nuk mund ta regjistrojë authenticator-in.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form className="grid gap-4" onSubmit={bootstrapForm.handleSubmit(onBootstrap)}>
+                <Field
+                  label="Tokeni njëpërdorimësh"
+                  error={bootstrapForm.formState.errors.token?.message}
+                >
+                  <Input
+                    type="password"
+                    autoComplete="off"
+                    spellCheck={false}
+                    {...bootstrapForm.register("token")}
+                  />
+                </Field>
+                {error ? <p role="alert" className="text-sm font-medium text-destructive">{error}</p> : null}
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="w-full"
+                  disabled={bootstrapForm.formState.isSubmitting}
+                >
+                  {bootstrapForm.formState.isSubmitting ? "Duke autorizuar…" : "Autorizo dhe vazhdo"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setMfaChallenge(null);
+                    setError(null);
+                    bootstrapForm.reset();
+                  }}
+                >
+                  Fillo përsëri
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </section>
+      );
+    }
     const enrollment = mfaChallenge.mode === "enroll" && mfaChallenge.setup;
     return (
       <section className="brand-ink flex min-h-[calc(100dvh-7rem)] items-center justify-center px-4 py-12">
@@ -334,7 +453,14 @@ export function AdminPage() {
                 />
               </Field>
               {error ? <p role="alert" className="text-sm font-medium text-destructive">{error}</p> : null}
-              <Button type="submit" size="lg" className="w-full">Verifiko dhe vazhdo</Button>
+              <Button
+                type="submit"
+                size="lg"
+                className="w-full"
+                disabled={mfaForm.formState.isSubmitting}
+              >
+                {mfaForm.formState.isSubmitting ? "Duke verifikuar…" : "Verifiko dhe vazhdo"}
+              </Button>
               <Button
                 type="button"
                 variant="ghost"
@@ -374,7 +500,14 @@ export function AdminPage() {
                 <Input type="password" autoComplete="current-password" {...loginForm.register("password")} />
               </Field>
               {error ? <p role="alert" className="text-sm font-medium text-destructive">{error}</p> : null}
-              <Button type="submit" size="lg" className="mt-2 w-full">Kyçu</Button>
+              <Button
+                type="submit"
+                size="lg"
+                className="mt-2 w-full"
+                disabled={loginForm.formState.isSubmitting}
+              >
+                {loginForm.formState.isSubmitting ? "Duke u kyçur…" : "Kyçu"}
+              </Button>
             </form>
           </CardContent>
         </Card>
@@ -402,6 +535,18 @@ export function AdminPage() {
           {notice}
         </div>
       ) : null}
+      {recoveryCodeUsed ? (
+        <div role="status" className="mt-6 flex items-start gap-3 rounded-md border border-amber-500 bg-amber-500/10 p-4 text-sm text-amber-950">
+          <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+          <div>
+            <p className="font-semibold">U përdor një kod rikuperimi.</p>
+            <p className="mt-1">
+              Kodi u çaktivizua. Gjenero një grup të ri kodesh nga cilësimet e sigurisë
+              sapo të kesh qasje te authenticator-i.
+            </p>
+          </div>
+        </div>
+      ) : null}
       {error ? (
         <div role="alert" className="mt-6 rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive">
           {error}
@@ -426,6 +571,44 @@ export function AdminPage() {
 
       <div className="mt-8 grid gap-6 xl:grid-cols-[380px_1fr] xl:items-start">
         <div className="grid gap-6">
+          <Card className="shadow-none">
+            <CardHeader>
+              <ShieldCheck className="h-6 w-6 text-primary" aria-hidden="true" />
+              <CardTitle>Siguria e rikuperimit</CardTitle>
+              <CardDescription>
+                Zëvendëso të gjitha kodet e rikuperimit vetëm pas një verifikimi të freskët TOTP.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form
+                className="grid gap-4"
+                onSubmit={recoveryRegenerationForm.handleSubmit(onRegenerateRecoveryCodes)}
+              >
+                <Field
+                  label="Kodi aktual nga authenticator-i"
+                  error={recoveryRegenerationForm.formState.errors.code?.message}
+                >
+                  <Input
+                    autoComplete="one-time-code"
+                    inputMode="numeric"
+                    maxLength={6}
+                    placeholder="123456"
+                    {...recoveryRegenerationForm.register("code")}
+                  />
+                </Field>
+                <Button
+                  type="submit"
+                  variant="outline"
+                  disabled={recoveryRegenerationForm.formState.isSubmitting}
+                >
+                  {recoveryRegenerationForm.formState.isSubmitting
+                    ? "Duke gjeneruar…"
+                    : "Gjenero kode të reja"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
           <Card className="shadow-none">
             <CardHeader>
               <CardTitle>Kategori e re</CardTitle>

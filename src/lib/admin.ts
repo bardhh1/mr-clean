@@ -19,6 +19,17 @@ export async function verifyAdminMfa(challengeToken: string, code: string) {
   });
 }
 
+export async function authorizeAdminMfaEnrollment(
+  challengeToken: string,
+  bootstrapToken: string
+) {
+  return apiRequest<MfaChallenge>("/admin/auth/mfa/bootstrap", {
+    method: "POST",
+    body: { challenge_token: challengeToken, bootstrap_token: bootstrapToken },
+    retryAuth: false
+  });
+}
+
 export async function regenerateAdminRecoveryCodes(code: string) {
   return apiRequest<{ recoveryCodes: string[] }>("/admin/auth/mfa/recovery-codes", {
     method: "POST",
@@ -126,7 +137,7 @@ export type AdminUser = {
 
 export type MfaChallenge = {
   status: "mfa_required";
-  mode: "enroll" | "verify";
+  mode: "bootstrap" | "enroll" | "verify";
   challengeToken: string;
   expiresInSeconds: number;
   setup?: {

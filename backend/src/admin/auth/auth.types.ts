@@ -27,7 +27,7 @@ export type AdminSessionSummary = {
 
 export type MfaLoginChallenge = {
   status: "mfa_required";
-  mode: "enroll" | "verify";
+  mode: "bootstrap" | "enroll" | "verify";
   challengeToken: string;
   expiresInSeconds: number;
   setup?: {

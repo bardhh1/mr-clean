@@ -2,7 +2,8 @@ import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import { InjectRepository } from "@nestjs/typeorm";
-import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 import { DataSource, type EntityManager, IsNull, MoreThan, Not, Repository } from "typeorm";
 import type { AppEnvironment } from "../../config/env.validation";
 import {
@@ -45,6 +46,7 @@ export class AdminAuthService {
   ) {}
 
   async verifyCredentials(email: string, password: string): Promise<AdminUserEntity> {
+    const startedAt = Date.now();
     const normalizedEmail = email.trim().toLowerCase();
     const candidate = await this.users.findOne({
       where: { email: normalizedEmail, is_active: true }
@@ -53,13 +55,13 @@ export class AdminAuthService {
       ? verifyPassword(password, candidate.password_hash)
       : verifyPassword(password, dummyPasswordHash);
 
-    if (!candidate) throw new UnauthorizedException(genericLoginMessage);
+    if (!candidate) return this.rejectInvalidCredentials(startedAt);
     if (candidate.locked_until && candidate.locked_until.getTime() > Date.now()) {
-      throw new UnauthorizedException(genericLoginMessage);
+      return this.rejectInvalidCredentials(startedAt);
     }
     if (!passwordMatches) {
       await this.recordFailedLogin(candidate.id);
-      throw new UnauthorizedException(genericLoginMessage);
+      return this.rejectInvalidCredentials(startedAt);
     }
 
     const result = await this.dataSource.transaction(async (manager) => {
@@ -87,7 +89,7 @@ export class AdminAuthService {
       return user;
     });
 
-    if (!result) throw new UnauthorizedException(genericLoginMessage);
+    if (!result) return this.rejectInvalidCredentials(startedAt);
     return result;
   }
 
@@ -337,6 +339,16 @@ export class AdminAuthService {
       }
       await repository.save(user);
     });
+  }
+
+  private async rejectInvalidCredentials(startedAt: number): Promise<never> {
+    const minimum = this.config.get("ADMIN_LOGIN_MIN_DURATION_MS", { infer: true });
+    if (minimum > 0) {
+      const targetDuration = minimum + randomInt(0, 51);
+      const remaining = targetDuration - (Date.now() - startedAt);
+      if (remaining > 0) await delay(remaining);
+    }
+    throw new UnauthorizedException(genericLoginMessage);
   }
 
   private async createSession(

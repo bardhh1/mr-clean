@@ -1,6 +1,7 @@
 import {
   createCipheriv,
   createDecipheriv,
+  createHash,
   createHmac,
   randomBytes,
   timingSafeEqual
@@ -104,6 +105,15 @@ export function hashRecoveryCode(code: string, pepper: string): string {
   const normalized = normalizeRecoveryCode(code);
   if (!normalized) throw new Error("Recovery code is invalid");
   return createHmac("sha256", pepper).update(normalized).digest("hex");
+}
+
+export function hashBootstrapToken(token: string): string {
+  if (!/^[A-Za-z0-9_-]{43}$/.test(token)) throw new Error("MFA bootstrap token is invalid");
+  const decoded = Buffer.from(token, "base64url");
+  if (decoded.length !== 32 || decoded.toString("base64url") !== token) {
+    throw new Error("MFA bootstrap token is invalid");
+  }
+  return createHash("sha256").update(decoded).digest("hex");
 }
 
 function hotp(secret: string, counter: number): string {

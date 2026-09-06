@@ -26,6 +26,7 @@ Local development needs PostgreSQL plus S3-compatible credentials matching `.env
 - Active admin sessions: `GET /api/v1/admin/auth/sessions`
 - Revoke all admin sessions: `POST /api/v1/admin/auth/logout-all`
 - Finish MFA enrollment or login: `POST /api/v1/admin/auth/mfa/verify`
+- Authorize first-time MFA enrollment: `POST /api/v1/admin/auth/mfa/bootstrap`
 - Replace recovery codes after fresh TOTP: `POST /api/v1/admin/auth/mfa/recovery-codes`
 
 ## Commands
@@ -34,15 +35,23 @@ Local development needs PostgreSQL plus S3-compatible credentials matching `.env
 npm run lint
 npm run test
 npm run build
+npm run test:coverage
 npm run db:migrate
 npm run db:migration:show
 ```
 
-Create or reset an administrator only from a trusted environment:
+Create an MFA-disabled administrator only from a trusted environment and supply a fresh,
+short-lived 32-byte Base64URL bootstrap token:
 
 ```bash
+export MFA_BOOTSTRAP_TOKEN="$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=')"
 ADMIN_EMAIL=owner@example.com ADMIN_PASSWORD='use-a-long-unique-password' npm run admin:create
 ```
+
+For an owner migrated from Phase 08, issue the first bootstrap authorization with
+`npm run admin:mfa-bootstrap`. Emergency recovery uses `npm run admin:mfa-reset`; both commands
+require the current password, an explicit confirmation phrase, and a fresh bootstrap token.
+See the Phase 09 runbook before running any of these commands in production.
 
 ## Architecture record
 

@@ -21,6 +21,11 @@ describe("administrator MFA migration", () => {
     expect(sql).toContain("mfa_enrollment_required");
     expect(sql).toContain("mfa_verified_at");
     expect(sql).toContain("pending_secret_ciphertext");
+    expect(sql).toContain("mfa_bootstrap_token_hash");
+    expect(sql).toContain("mfa_bootstrap_expires_at");
+    expect(sql).toContain("'bootstrap'");
+    expect(sql).toContain("ck_admin_sessions_active_requires_mfa");
+    expect(sql).toContain("mfa_bootstrap_issued");
     expect(sql).toContain("WHERE \"revoked_at\" IS NULL");
   });
 });

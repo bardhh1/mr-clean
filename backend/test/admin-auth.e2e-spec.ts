@@ -6,17 +6,18 @@ import { DataSource } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AdminUserEntity } from "../src/admin/entities/admin-user.entity";
 import { hashPassword } from "../src/admin/auth/password";
-import { totpCode } from "../src/admin/auth/mfa";
+import { hashBootstrapToken, totpCode } from "../src/admin/auth/mfa";
 import { AppModule } from "../src/app.module";
 import { configureApplication } from "../src/configure-application";
 
 const ownerEmail = "owner-auth-e2e@example.invalid";
 const ownerPassword = "e2e-owner-password-with-enough-entropy";
 const trustedClient = { "x-mr-clean-client": "mr-clean-web-v1" };
+const bootstrapToken = "Ym9vdHN0cmFwLXRva2VuLXRlc3QtdmFsdWUtMzIhISE";
 
 type MfaChallengeBody = {
   challengeToken: string;
-  mode: "enroll" | "verify";
+  mode: "bootstrap" | "enroll" | "verify";
   setup?: { secret: string };
 };
 
@@ -52,7 +53,9 @@ describe("Single-owner authentication (e2e)", () => {
       mfa_enabled: false,
       mfa_secret_ciphertext: null,
       mfa_enrolled_at: null,
-      last_totp_counter: null
+      last_totp_counter: null,
+      mfa_bootstrap_token_hash: hashBootstrapToken(bootstrapToken),
+      mfa_bootstrap_expires_at: new Date(Date.now() + 15 * 60_000)
     }));
   });
 
@@ -65,13 +68,24 @@ describe("Single-owner authentication (e2e)", () => {
 
   it("rotates cookies, contains refresh replay, and revokes all sessions", async () => {
     const browser = request.agent(server);
-    const enrollment = await browser
+    const bootstrap = await browser
       .post("/api/v1/admin/auth/login")
       .set(trustedClient)
       .send({ email: ownerEmail, password: ownerPassword })
       .expect(200);
+    expect(bootstrap.body).toMatchObject({ status: "mfa_required", mode: "bootstrap" });
+    expect((bootstrap.body as MfaChallengeBody).setup).toBeUndefined();
+    expect(bootstrap.headers["cache-control"]).toBe("no-store");
+    const bootstrapBody = bootstrap.body as MfaChallengeBody;
+    const enrollment = await browser
+      .post("/api/v1/admin/auth/mfa/bootstrap")
+      .set(trustedClient)
+      .send({
+        challenge_token: bootstrapBody.challengeToken,
+        bootstrap_token: bootstrapToken
+      })
+      .expect(200);
     expect(enrollment.body).toMatchObject({ status: "mfa_required", mode: "enroll" });
-    expect(enrollment.headers["cache-control"]).toBe("no-store");
     const enrollmentBody = enrollment.body as MfaChallengeBody;
     if (!enrollmentBody.setup) throw new Error("Enrollment secret was not returned");
     const enrolled = await browser

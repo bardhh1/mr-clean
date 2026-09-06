@@ -9,7 +9,7 @@ import {
 } from "typeorm";
 import { AdminUserEntity } from "./admin-user.entity";
 
-export const mfaChallengePurposes = ["enrollment", "login"] as const;
+export const mfaChallengePurposes = ["bootstrap", "enrollment", "login"] as const;
 export type MfaChallengePurpose = typeof mfaChallengePurposes[number];
 
 @Entity({ name: "admin_mfa_challenges" })

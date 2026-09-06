@@ -1,7 +1,9 @@
 import dataSource from "../database/data-source";
 import { hashPassword } from "../admin/auth/password";
+import { AdminMfaChallengeEntity } from "../admin/entities/admin-mfa-challenge.entity";
 import { AdminSessionEntity } from "../admin/entities/admin-session.entity";
 import { AdminUserEntity } from "../admin/entities/admin-user.entity";
+import { readMfaBootstrapInput } from "./mfa-bootstrap-input";
 
 async function createAdmin(): Promise<void> {
   const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
@@ -48,7 +50,9 @@ async function createAdmin(): Promise<void> {
         mfa_enabled: false,
         mfa_secret_ciphertext: null,
         mfa_enrolled_at: null,
-        last_totp_counter: null
+        last_totp_counter: null,
+        mfa_bootstrap_token_hash: null,
+        mfa_bootstrap_expires_at: null
       });
       user.password_hash = hashPassword(password);
       user.role = "admin";
@@ -57,7 +61,17 @@ async function createAdmin(): Promise<void> {
       user.last_failed_login_at = null;
       user.locked_until = null;
       user.password_changed_at = now;
+      if (user.mfa_enabled) {
+        user.mfa_bootstrap_token_hash = null;
+        user.mfa_bootstrap_expires_at = null;
+      } else {
+        const bootstrap = readMfaBootstrapInput(process.env, now);
+        user.mfa_bootstrap_token_hash = bootstrap.tokenHash;
+        user.mfa_bootstrap_expires_at = bootstrap.expiresAt;
+      }
       const saved = await repository.save(user);
+
+      await manager.getRepository(AdminMfaChallengeEntity).delete({ admin_user_id: saved.id });
 
       await manager.getRepository(AdminSessionEntity)
         .createQueryBuilder()
@@ -67,7 +81,9 @@ async function createAdmin(): Promise<void> {
         .andWhere("revoked_at IS NULL")
         .execute();
     });
-    console.log(`Admin account is ready: ${email}`);
+    console.log(
+      `Admin account is ready: ${email}. If MFA is not enrolled, use the one-time bootstrap token before it expires.`
+    );
   } finally {
     await dataSource.destroy();
   }

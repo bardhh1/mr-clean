@@ -57,6 +57,12 @@ export class AdminUserEntity {
   } })
   last_totp_counter!: number | null;
 
+  @Column({ type: "char", length: 64, nullable: true })
+  mfa_bootstrap_token_hash!: string | null;
+
+  @Column({ type: "timestamptz", nullable: true })
+  mfa_bootstrap_expires_at!: Date | null;
+
   @CreateDateColumn({ type: "timestamptz" })
   created_at!: Date;
 

@@ -10,10 +10,29 @@ export class AdminMfaFoundation1788480000000 implements MigrationInterface {
         ADD COLUMN "mfa_secret_ciphertext" text,
         ADD COLUMN "mfa_enrolled_at" timestamptz,
         ADD COLUMN "last_totp_counter" bigint,
+        ADD COLUMN "mfa_bootstrap_token_hash" char(64),
+        ADD COLUMN "mfa_bootstrap_expires_at" timestamptz,
         ADD CONSTRAINT "ck_admin_users_mfa_state" CHECK (
-          (NOT "mfa_enabled" AND "mfa_secret_ciphertext" IS NULL AND "mfa_enrolled_at" IS NULL)
+          (
+            NOT "mfa_enabled"
+            AND "mfa_secret_ciphertext" IS NULL
+            AND "mfa_enrolled_at" IS NULL
+            AND "last_totp_counter" IS NULL
+            AND (
+              ("mfa_bootstrap_token_hash" IS NULL AND "mfa_bootstrap_expires_at" IS NULL)
+              OR
+              ("mfa_bootstrap_token_hash" IS NOT NULL AND "mfa_bootstrap_expires_at" IS NOT NULL)
+            )
+          )
           OR
-          ("mfa_enabled" AND "mfa_secret_ciphertext" IS NOT NULL AND "mfa_enrolled_at" IS NOT NULL)
+          (
+            "mfa_enabled"
+            AND "mfa_secret_ciphertext" IS NOT NULL
+            AND "mfa_enrolled_at" IS NOT NULL
+            AND "last_totp_counter" IS NOT NULL
+            AND "mfa_bootstrap_token_hash" IS NULL
+            AND "mfa_bootstrap_expires_at" IS NULL
+          )
         )
     `);
 
@@ -33,6 +52,7 @@ export class AdminMfaFoundation1788480000000 implements MigrationInterface {
             'expired',
             'password_changed',
             'mfa_enrollment_required',
+            'mfa_bootstrap_issued',
             'mfa_reset',
             'owner_disabled'
           )
@@ -42,6 +62,12 @@ export class AdminMfaFoundation1788480000000 implements MigrationInterface {
       UPDATE "admin_sessions"
       SET "revoked_at" = now(), "revocation_reason" = 'mfa_enrollment_required'
       WHERE "revoked_at" IS NULL
+    `);
+    await queryRunner.query(`
+      ALTER TABLE "admin_sessions"
+        ADD CONSTRAINT "ck_admin_sessions_active_requires_mfa" CHECK (
+          "revoked_at" IS NOT NULL OR "mfa_verified_at" IS NOT NULL
+        )
     `);
 
     await queryRunner.query(`
@@ -59,12 +85,14 @@ export class AdminMfaFoundation1788480000000 implements MigrationInterface {
         CONSTRAINT "fk_admin_mfa_challenges_user" FOREIGN KEY ("admin_user_id")
           REFERENCES "admin_users"("id") ON DELETE CASCADE ON UPDATE CASCADE,
         CONSTRAINT "uq_admin_mfa_challenges_token_hash" UNIQUE ("token_hash"),
-        CONSTRAINT "ck_admin_mfa_challenges_purpose" CHECK ("purpose" IN ('enrollment', 'login')),
+        CONSTRAINT "ck_admin_mfa_challenges_purpose" CHECK (
+          "purpose" IN ('bootstrap', 'enrollment', 'login')
+        ),
         CONSTRAINT "ck_admin_mfa_challenges_attempts" CHECK ("failed_attempts" BETWEEN 0 AND 100),
         CONSTRAINT "ck_admin_mfa_challenges_secret" CHECK (
           ("purpose" = 'enrollment' AND "pending_secret_ciphertext" IS NOT NULL)
           OR
-          ("purpose" = 'login' AND "pending_secret_ciphertext" IS NULL)
+          ("purpose" IN ('bootstrap', 'login') AND "pending_secret_ciphertext" IS NULL)
         )
       )
     `);
@@ -102,10 +130,15 @@ export class AdminMfaFoundation1788480000000 implements MigrationInterface {
     await queryRunner.query(`
       UPDATE "admin_sessions"
       SET "revocation_reason" = 'logout'
-      WHERE "revocation_reason" IN ('mfa_enrollment_required', 'mfa_reset')
+      WHERE "revocation_reason" IN (
+        'mfa_enrollment_required',
+        'mfa_bootstrap_issued',
+        'mfa_reset'
+      )
     `);
     await queryRunner.query(`
       ALTER TABLE "admin_sessions"
+        DROP CONSTRAINT "ck_admin_sessions_active_requires_mfa",
         DROP CONSTRAINT "ck_admin_sessions_revocation_reason",
         DROP COLUMN "mfa_verified_at",
         ADD CONSTRAINT "ck_admin_sessions_revocation_reason" CHECK (
@@ -124,6 +157,8 @@ export class AdminMfaFoundation1788480000000 implements MigrationInterface {
     await queryRunner.query(`
       ALTER TABLE "admin_users"
         DROP CONSTRAINT "ck_admin_users_mfa_state",
+        DROP COLUMN "mfa_bootstrap_expires_at",
+        DROP COLUMN "mfa_bootstrap_token_hash",
         DROP COLUMN "last_totp_counter",
         DROP COLUMN "mfa_enrolled_at",
         DROP COLUMN "mfa_secret_ciphertext",

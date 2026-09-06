@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { HttpException, HttpStatus, Injectable, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { DataSource, IsNull, type Repository } from "typeorm";
@@ -14,6 +14,7 @@ import {
   encryptMfaSecret,
   generateRecoveryCodes,
   generateTotpSecret,
+  hashBootstrapToken,
   hashRecoveryCode,
   normalizeRecoveryCode,
   totpUri,
@@ -50,28 +51,32 @@ export class AdminMfaService {
       const now = new Date();
       const challenges = manager.getRepository(AdminMfaChallengeEntity);
       await challenges.createQueryBuilder()
-        .update(AdminMfaChallengeEntity)
-        .set({ consumed_at: now })
+        .delete()
+        .from(AdminMfaChallengeEntity)
         .where("admin_user_id = :adminUserId", { adminUserId: user.id })
-        .andWhere("consumed_at IS NULL")
+        .andWhere("(consumed_at IS NOT NULL OR expires_at <= :now)", { now })
         .execute();
+
+      const activeChallenges = await challenges.countBy({
+        admin_user_id: user.id,
+        consumed_at: IsNull()
+      });
+      if (activeChallenges >= this.config.get("MFA_MAX_ACTIVE_CHALLENGES", { infer: true })) {
+        throw new HttpException(
+          "Too many active MFA challenges; wait for one to expire",
+          HttpStatus.TOO_MANY_REQUESTS
+        );
+      }
 
       const id = randomUUID();
       const tokenSecret = randomBytes(32).toString("base64url");
       const ttlSeconds = this.config.get("MFA_CHALLENGE_TTL_SECONDS", { infer: true });
-      const enrollmentSecret = user.mfa_enabled ? null : generateTotpSecret();
       const challenge = challenges.create({
         id,
         admin_user_id: user.id,
-        purpose: user.mfa_enabled ? "login" : "enrollment",
+        purpose: user.mfa_enabled ? "login" : "bootstrap",
         token_hash: this.hashChallengeSecret(tokenSecret),
-        pending_secret_ciphertext: enrollmentSecret
-          ? encryptMfaSecret(
-            enrollmentSecret,
-            this.config.get("MFA_ENCRYPTION_KEY", { infer: true }),
-            this.challengeContext(id)
-          )
-          : null,
+        pending_secret_ciphertext: null,
         password_changed_at: user.password_changed_at,
         failed_attempts: 0,
         expires_at: new Date(now.getTime() + ttlSeconds * 1_000),
@@ -81,11 +86,100 @@ export class AdminMfaService {
 
       return {
         status: "mfa_required",
-        mode: enrollmentSecret ? "enroll" : "verify",
+        mode: user.mfa_enabled ? "verify" : "bootstrap",
         challengeToken: `${id}.${tokenSecret}`,
-        expiresInSeconds: ttlSeconds,
-        setup: enrollmentSecret
-          ? {
+        expiresInSeconds: ttlSeconds
+      };
+    });
+  }
+
+  async bootstrap(challengeToken: string, bootstrapToken: string): Promise<MfaLoginChallenge> {
+    const parsed = this.parseChallengeToken(challengeToken);
+    const outcome = await this.dataSource.transaction(async (manager) => {
+      const challenges = manager.getRepository(AdminMfaChallengeEntity);
+      const reference = await challenges.findOneBy({ id: parsed.challengeId });
+      if (!reference) return { kind: "invalid" as const };
+
+      const users = manager.getRepository(AdminUserEntity);
+      const user = await users.findOne({
+        where: { id: reference.admin_user_id },
+        lock: { mode: "pessimistic_write" }
+      });
+      const challenge = await challenges.findOne({
+        where: { id: parsed.challengeId, admin_user_id: reference.admin_user_id },
+        lock: { mode: "pessimistic_write" }
+      });
+      const now = new Date();
+      if (
+        !user
+        || !challenge
+        || challenge.purpose !== "bootstrap"
+        || !this.matchesChallengeSecret(challenge.token_hash, parsed.secret)
+        || challenge.consumed_at
+        || challenge.expires_at.getTime() <= now.getTime()
+        || challenge.failed_attempts >= this.maxAttempts()
+        || !user.is_active
+        || user.role !== "admin"
+        || user.mfa_enabled
+        || (user.locked_until && user.locked_until.getTime() > now.getTime())
+        || user.password_changed_at.getTime() !== challenge.password_changed_at.getTime()
+      ) {
+        return { kind: "invalid" as const };
+      }
+
+      let suppliedHash = "";
+      try {
+        suppliedHash = hashBootstrapToken(bootstrapToken);
+      } catch {
+        // The DTO rejects malformed values; this keeps direct service use fail-closed.
+      }
+      const expectedBootstrapHash = user.mfa_bootstrap_token_hash ?? "0".repeat(64);
+      const tokenDigestMatches = this.matchesDigest(expectedBootstrapHash, suppliedHash);
+      const bootstrapMatches = Boolean(
+        user.mfa_bootstrap_token_hash
+        && user.mfa_bootstrap_expires_at
+        && user.mfa_bootstrap_expires_at.getTime() > now.getTime()
+        && tokenDigestMatches
+      );
+      if (!bootstrapMatches) {
+        challenge.failed_attempts += 1;
+        this.recordFailedMfaAttempt(user, now);
+        if (
+          challenge.failed_attempts >= this.maxAttempts()
+          || (user.locked_until && user.locked_until.getTime() > now.getTime())
+        ) {
+          challenge.consumed_at = now;
+        }
+        await users.save(user);
+        await challenges.save(challenge);
+        return { kind: "invalid" as const };
+      }
+
+      const enrollmentSecret = generateTotpSecret();
+      const nextTokenSecret = randomBytes(32).toString("base64url");
+      const ttlSeconds = this.config.get("MFA_CHALLENGE_TTL_SECONDS", { infer: true });
+      challenge.purpose = "enrollment";
+      challenge.token_hash = this.hashChallengeSecret(nextTokenSecret);
+      challenge.pending_secret_ciphertext = encryptMfaSecret(
+        enrollmentSecret,
+        this.config.get("MFA_ENCRYPTION_KEY", { infer: true }),
+        this.challengeContext(challenge.id)
+      );
+      challenge.failed_attempts = 0;
+      challenge.expires_at = new Date(now.getTime() + ttlSeconds * 1_000);
+      user.mfa_bootstrap_token_hash = null;
+      user.mfa_bootstrap_expires_at = null;
+      await users.save(user);
+      await challenges.save(challenge);
+
+      return {
+        kind: "success" as const,
+        response: {
+          status: "mfa_required" as const,
+          mode: "enroll" as const,
+          challengeToken: `${challenge.id}.${nextTokenSecret}`,
+          expiresInSeconds: ttlSeconds,
+          setup: {
             secret: enrollmentSecret,
             otpauthUri: totpUri(
               user.email,
@@ -93,9 +187,12 @@ export class AdminMfaService {
               this.config.get("MFA_ISSUER", { infer: true })
             )
           }
-          : undefined
+        }
       };
     });
+
+    if (outcome.kind !== "success") throw new UnauthorizedException(genericMfaMessage);
+    return outcome.response;
   }
 
   async complete(challengeToken: string, code: string) {
@@ -118,6 +215,7 @@ export class AdminMfaService {
       if (
         !user
         || !challenge
+        || challenge.purpose === "bootstrap"
         || !this.matchesChallengeSecret(challenge.token_hash, parsed.secret)
         || challenge.consumed_at
         || challenge.expires_at.getTime() <= now.getTime()
@@ -241,10 +339,15 @@ export class AdminMfaService {
       });
       if (
         !user?.is_active
+        || user.role !== "admin"
         || !user.mfa_enabled
         || !user.mfa_secret_ciphertext
         || !session
         || session.revoked_at
+        || session.compromised_at
+        || !session.mfa_verified_at
+        || session.expires_at.getTime() <= Date.now()
+        || session.family_expires_at.getTime() <= Date.now()
         || (user.locked_until && user.locked_until.getTime() > Date.now())
       ) {
         throw new UnauthorizedException(genericMfaMessage);
@@ -317,8 +420,12 @@ export class AdminMfaService {
   }
 
   private matchesChallengeSecret(expectedHash: string, secret: string): boolean {
+    return this.matchesDigest(expectedHash, this.hashChallengeSecret(secret));
+  }
+
+  private matchesDigest(expectedHash: string, actualHash: string): boolean {
     const expected = Buffer.from(expectedHash, "hex");
-    const actual = Buffer.from(this.hashChallengeSecret(secret), "hex");
+    const actual = Buffer.from(actualHash, "hex");
     return expected.length === actual.length && timingSafeEqual(expected, actual);
   }
 

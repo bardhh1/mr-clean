@@ -3,6 +3,7 @@ import {
   decryptMfaSecret,
   encryptMfaSecret,
   generateRecoveryCodes,
+  hashBootstrapToken,
   hashRecoveryCode,
   normalizeRecoveryCode,
   verifyTotp
@@ -37,5 +38,11 @@ describe("MFA primitives", () => {
     expect(normalizeRecoveryCode(code.toLowerCase())).toBe(code.replaceAll("-", ""));
     expect(hashRecoveryCode(code, "pepper-one-that-is-long-enough-1234"))
       .not.toBe(hashRecoveryCode(code, "pepper-two-that-is-long-enough-1234"));
+  });
+
+  it("hashes only canonical 256-bit bootstrap tokens", () => {
+    const token = "Ym9vdHN0cmFwLXRva2VuLXRlc3QtdmFsdWUtMzIhISE";
+    expect(hashBootstrapToken(token)).toMatch(/^[a-f0-9]{64}$/);
+    expect(() => hashBootstrapToken("too-short")).toThrow("invalid");
   });
 });

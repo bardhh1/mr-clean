@@ -6,12 +6,24 @@ import { DataSource } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AdminUserEntity } from "../src/admin/entities/admin-user.entity";
 import { hashPassword } from "../src/admin/auth/password";
+import { hashBootstrapToken, totpCode } from "../src/admin/auth/mfa";
 import { AppModule } from "../src/app.module";
 import { configureApplication } from "../src/configure-application";
 
 const ownerEmail = "owner-auth-e2e@example.invalid";
 const ownerPassword = "e2e-owner-password-with-enough-entropy";
 const trustedClient = { "x-mr-clean-client": "mr-clean-web-v1" };
+const bootstrapToken = "Ym9vdHN0cmFwLXRva2VuLXRlc3QtdmFsdWUtMzIhISE";
+
+type MfaChallengeBody = {
+  challengeToken: string;
+  mode: "bootstrap" | "enroll" | "verify";
+  setup?: { secret: string };
+};
+
+type MfaVerificationBody = {
+  recovery_codes?: string[];
+};
 
 describe("Single-owner authentication (e2e)", () => {
   let app: INestApplication;
@@ -37,7 +49,13 @@ describe("Single-owner authentication (e2e)", () => {
       last_failed_login_at: null,
       locked_until: null,
       password_changed_at: new Date(),
-      last_login_at: null
+      last_login_at: null,
+      mfa_enabled: false,
+      mfa_secret_ciphertext: null,
+      mfa_enrolled_at: null,
+      last_totp_counter: null,
+      mfa_bootstrap_token_hash: hashBootstrapToken(bootstrapToken),
+      mfa_bootstrap_expires_at: new Date(Date.now() + 15 * 60_000)
     }));
   });
 
@@ -50,12 +68,38 @@ describe("Single-owner authentication (e2e)", () => {
 
   it("rotates cookies, contains refresh replay, and revokes all sessions", async () => {
     const browser = request.agent(server);
-    const login = await browser
+    const bootstrap = await browser
       .post("/api/v1/admin/auth/login")
       .set(trustedClient)
       .send({ email: ownerEmail, password: ownerPassword })
       .expect(200);
-    const originalRefreshCookie = cookiePair(login.headers["set-cookie"], "mr_clean_refresh");
+    expect(bootstrap.body).toMatchObject({ status: "mfa_required", mode: "bootstrap" });
+    expect((bootstrap.body as MfaChallengeBody).setup).toBeUndefined();
+    expect(bootstrap.headers["cache-control"]).toBe("no-store");
+    const bootstrapBody = bootstrap.body as MfaChallengeBody;
+    const enrollment = await browser
+      .post("/api/v1/admin/auth/mfa/bootstrap")
+      .set(trustedClient)
+      .send({
+        challenge_token: bootstrapBody.challengeToken,
+        bootstrap_token: bootstrapToken
+      })
+      .expect(200);
+    expect(enrollment.body).toMatchObject({ status: "mfa_required", mode: "enroll" });
+    const enrollmentBody = enrollment.body as MfaChallengeBody;
+    if (!enrollmentBody.setup) throw new Error("Enrollment secret was not returned");
+    const enrolled = await browser
+      .post("/api/v1/admin/auth/mfa/verify")
+      .set(trustedClient)
+      .send({
+        challenge_token: enrollmentBody.challengeToken,
+        code: totpCode(enrollmentBody.setup.secret)
+      })
+      .expect(200);
+    expect(enrolled.headers["cache-control"]).toBe("no-store");
+    const recoveryCodes = (enrolled.body as MfaVerificationBody).recovery_codes ?? [];
+    expect(recoveryCodes).toHaveLength(10);
+    const originalRefreshCookie = cookiePair(enrolled.headers["set-cookie"], "mr_clean_refresh");
 
     const activeSessions = await browser
       .get("/api/v1/admin/auth/sessions")
@@ -80,10 +124,20 @@ describe("Single-owner authentication (e2e)", () => {
       .get("/api/v1/admin/auth/me")
       .expect(401);
 
-    const logoutLogin = await browser
+    const logoutChallenge = await browser
       .post("/api/v1/admin/auth/login")
       .set(trustedClient)
       .send({ email: ownerEmail, password: ownerPassword })
+      .expect(200);
+    expect(logoutChallenge.body).toMatchObject({ mode: "verify" });
+    const logoutChallengeBody = logoutChallenge.body as MfaChallengeBody;
+    const logoutLogin = await browser
+      .post("/api/v1/admin/auth/mfa/verify")
+      .set(trustedClient)
+      .send({
+        challenge_token: logoutChallengeBody.challengeToken,
+        code: recoveryCodes[0]
+      })
       .expect(200);
     const logoutParentCookie = cookiePair(
       logoutLogin.headers["set-cookie"],
@@ -102,10 +156,19 @@ describe("Single-owner authentication (e2e)", () => {
       .get("/api/v1/admin/auth/me")
       .expect(401);
 
-    await browser
+    const finalChallenge = await browser
       .post("/api/v1/admin/auth/login")
       .set(trustedClient)
       .send({ email: ownerEmail, password: ownerPassword })
+      .expect(200);
+    const finalChallengeBody = finalChallenge.body as MfaChallengeBody;
+    await browser
+      .post("/api/v1/admin/auth/mfa/verify")
+      .set(trustedClient)
+      .send({
+        challenge_token: finalChallengeBody.challengeToken,
+        code: recoveryCodes[1]
+      })
       .expect(200);
     await browser
       .post("/api/v1/admin/auth/logout-all")

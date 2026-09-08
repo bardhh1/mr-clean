@@ -2,8 +2,9 @@ import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import { InjectRepository } from "@nestjs/typeorm";
-import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
-import { DataSource, IsNull, MoreThan, Repository } from "typeorm";
+import { createHash, randomBytes, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
+import { DataSource, type EntityManager, IsNull, MoreThan, Not, Repository } from "typeorm";
 import type { AppEnvironment } from "../../config/env.validation";
 import {
   AdminSessionEntity,
@@ -44,7 +45,8 @@ export class AdminAuthService {
     private readonly config: ConfigService<AppEnvironment, true>
   ) {}
 
-  async login(email: string, password: string) {
+  async verifyCredentials(email: string, password: string): Promise<AdminUserEntity> {
+    const startedAt = Date.now();
     const normalizedEmail = email.trim().toLowerCase();
     const candidate = await this.users.findOne({
       where: { email: normalizedEmail, is_active: true }
@@ -53,13 +55,13 @@ export class AdminAuthService {
       ? verifyPassword(password, candidate.password_hash)
       : verifyPassword(password, dummyPasswordHash);
 
-    if (!candidate) throw new UnauthorizedException(genericLoginMessage);
+    if (!candidate) return this.rejectInvalidCredentials(startedAt);
     if (candidate.locked_until && candidate.locked_until.getTime() > Date.now()) {
-      throw new UnauthorizedException(genericLoginMessage);
+      return this.rejectInvalidCredentials(startedAt);
     }
     if (!passwordMatches) {
       await this.recordFailedLogin(candidate.id);
-      throw new UnauthorizedException(genericLoginMessage);
+      return this.rejectInvalidCredentials(startedAt);
     }
 
     const result = await this.dataSource.transaction(async (manager) => {
@@ -78,21 +80,33 @@ export class AdminAuthService {
         return null;
       }
 
-      user.failed_login_count = 0;
-      user.last_failed_login_at = null;
-      user.locked_until = null;
-      user.last_login_at = new Date();
+      if (user.locked_until && user.locked_until.getTime() <= Date.now()) {
+        user.failed_login_count = 0;
+        user.last_failed_login_at = null;
+        user.locked_until = null;
+      }
       await userRepository.save(user);
-
-      const created = await this.createSession(
-        manager.getRepository(AdminSessionEntity),
-        user
-      );
-      return { user, created };
+      return user;
     });
 
-    if (!result) throw new UnauthorizedException(genericLoginMessage);
-    return this.issueResult(result.user, result.created.session, result.created.refreshToken);
+    if (!result) return this.rejectInvalidCredentials(startedAt);
+    return result;
+  }
+
+  async createAuthenticatedSession(
+    manager: EntityManager,
+    user: AdminUserEntity,
+    mfaVerifiedAt: Date
+  ) {
+    if (!user.is_active || !user.mfa_enabled || !user.mfa_secret_ciphertext) {
+      throw new UnauthorizedException("Multi-factor authentication is required");
+    }
+    const created = await this.createSession(
+      manager.getRepository(AdminSessionEntity),
+      user,
+      { mfaVerifiedAt }
+    );
+    return this.issueResult(user, created.session, created.refreshToken);
   }
 
   async refresh(refreshToken: string) {
@@ -129,6 +143,10 @@ export class AdminAuthService {
         await this.revokeSession(sessionRepository, session, "owner_disabled", now);
         return { kind: "invalid" };
       }
+      if (!user.mfa_enabled || !session.mfa_verified_at) {
+        await this.revokeSession(sessionRepository, session, "mfa_enrollment_required", now);
+        return { kind: "invalid" };
+      }
       if (
         session.expires_at.getTime() <= now.getTime()
         || session.family_expires_at.getTime() <= now.getTime()
@@ -146,7 +164,8 @@ export class AdminAuthService {
       const created = await this.createSession(sessionRepository, user, {
         familyId: session.family_id,
         familyExpiresAt: session.family_expires_at,
-        parentSessionId: session.id
+        parentSessionId: session.id,
+        mfaVerifiedAt: session.mfa_verified_at
       });
       session.rotated_to_session_id = created.session.id;
       await sessionRepository.save(session);
@@ -230,7 +249,8 @@ export class AdminAuthService {
         admin_user_id: adminUserId,
         revoked_at: IsNull(),
         expires_at: MoreThan(new Date()),
-        family_expires_at: MoreThan(new Date())
+        family_expires_at: MoreThan(new Date()),
+        mfa_verified_at: Not(IsNull())
       },
       order: { created_at: "DESC" },
       take: 20
@@ -242,7 +262,8 @@ export class AdminAuthService {
       created_at: session.created_at,
       last_used_at: session.last_used_at,
       expires_at: session.expires_at,
-      family_expires_at: session.family_expires_at
+      family_expires_at: session.family_expires_at,
+      mfa_verified_at: session.mfa_verified_at as Date
     }));
   }
 
@@ -277,7 +298,9 @@ export class AdminAuthService {
       !session
       || session.revoked_at
       || session.compromised_at
+      || !session.mfa_verified_at
       || !session.user?.is_active
+      || !session.user.mfa_enabled
       || session.user.role !== "admin"
     ) {
       throw new UnauthorizedException("Admin session is no longer active");
@@ -318,13 +341,24 @@ export class AdminAuthService {
     });
   }
 
+  private async rejectInvalidCredentials(startedAt: number): Promise<never> {
+    const minimum = this.config.get("ADMIN_LOGIN_MIN_DURATION_MS", { infer: true });
+    if (minimum > 0) {
+      const targetDuration = minimum + randomInt(0, 51);
+      const remaining = targetDuration - (Date.now() - startedAt);
+      if (remaining > 0) await delay(remaining);
+    }
+    throw new UnauthorizedException(genericLoginMessage);
+  }
+
   private async createSession(
     repository: Repository<AdminSessionEntity>,
     user: AdminUserEntity,
     existingFamily?: {
-      familyId: string;
-      familyExpiresAt: Date;
-      parentSessionId: string;
+      familyId?: string;
+      familyExpiresAt?: Date;
+      parentSessionId?: string;
+      mfaVerifiedAt: Date | null;
     }
   ): Promise<CreatedSession> {
     const secret = randomBytes(48).toString("base64url");
@@ -352,7 +386,8 @@ export class AdminAuthService {
       revoked_at: null,
       revocation_reason: null,
       compromised_at: null,
-      last_used_at: null
+      last_used_at: null,
+      mfa_verified_at: existingFamily?.mfaVerifiedAt ?? null
     });
     const saved = await repository.save(session);
     return { session: saved, refreshToken: `${saved.id}.${secret}` };

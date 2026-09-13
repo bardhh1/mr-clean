@@ -1,6 +1,6 @@
 import { HttpException, HttpStatus, Injectable, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { DataSource, IsNull, type Repository } from "typeorm";
 import type { AppEnvironment } from "../../config/env.validation";
 import {
@@ -108,7 +108,8 @@ export class AdminMfaService {
     try {
       parsed = this.parseChallengeToken(challengeToken);
     } catch {
-      return this.rejectMalformedChallenge("mfa_bootstrap", context);
+      await this.recordMalformedChallenge("mfa_bootstrap", context);
+      throw new UnauthorizedException(genericMfaMessage);
     }
     const outcome = await this.dataSource.transaction(async (manager) => {
       const challenges = manager.getRepository(AdminMfaChallengeEntity);
@@ -234,7 +235,8 @@ export class AdminMfaService {
     try {
       parsed = this.parseChallengeToken(challengeToken);
     } catch {
-      return this.rejectMalformedChallenge("mfa_verify", context);
+      await this.recordMalformedChallenge("mfa_verify", context);
+      throw new UnauthorizedException(genericMfaMessage);
     }
     const outcome = await this.dataSource.transaction(async (manager) => {
       const challenges = manager.getRepository(AdminMfaChallengeEntity);
@@ -491,17 +493,16 @@ export class AdminMfaService {
     return { challengeId, secret };
   }
 
-  private async rejectMalformedChallenge(
+  private async recordMalformedChallenge(
     stage: "mfa_bootstrap" | "mfa_verify",
     context: AuditContext
-  ): Promise<never> {
+  ): Promise<void> {
     await this.audit.recordBestEffort({
       ...context,
       action: "auth.login.failed",
       outcome: "failure",
       metadata: { stage, reason: "malformed_challenge" }
     });
-    throw new UnauthorizedException(genericMfaMessage);
   }
 
   private matchesChallengeSecret(expectedHash: string, secret: string): boolean {
@@ -515,8 +516,14 @@ export class AdminMfaService {
   }
 
   private hashChallengeSecret(secret: string): string {
-    // Challenge secrets are 256 random bits and are never user-selected passwords.
-    return createHash("sha256").update(secret).digest("hex");
+    const key = Buffer.from(
+      this.config.get("MFA_RECOVERY_PEPPER", { infer: true }),
+      "base64url"
+    );
+    return createHmac("sha256", key)
+      .update("mr-clean:mfa-challenge:v1\0")
+      .update(secret)
+      .digest("hex");
   }
 
   private maxAttempts(): number {

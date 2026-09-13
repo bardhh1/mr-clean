@@ -24,14 +24,19 @@ export function configureApplication(app: INestApplication): string {
   const production = config.get("NODE_ENV", { infer: true }) === "production";
 
   app.use(helmet({
-    contentSecurityPolicy: production ? {
-      directives: {
+    contentSecurityPolicy: {
+      directives: production ? {
         defaultSrc: ["'none'"],
         baseUri: ["'none'"],
         formAction: ["'none'"],
         frameAncestors: ["'none'"]
+      } : {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:"]
       }
-    } : false,
+    },
     crossOriginResourcePolicy: { policy: "same-site" },
     hsts: production ? {
       maxAge: 63_072_000,

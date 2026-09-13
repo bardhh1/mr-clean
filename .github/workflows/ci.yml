@@ -78,7 +78,9 @@ jobs:
         run: npm run build
 
       - name: Audit backend dependencies
-        run: npm audit --audit-level=high
+        # npm 10's retired quick-audit endpoint rejects valid override trees.
+        # Pin the current audit client without changing the Node 22 runtime.
+        run: npx --yes npm@11.9.0 audit --audit-level=high
 
   backend-e2e:
     name: Backend E2E

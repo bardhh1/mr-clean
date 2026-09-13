@@ -5,6 +5,13 @@ import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import type { AppEnvironment } from "./config/env.validation";
 
+export function isCorsOriginAllowed(
+  origin: string | undefined,
+  allowedOrigins: ReadonlySet<string>
+): boolean {
+  return !origin || allowedOrigins.has(origin);
+}
+
 export function configureApplication(app: INestApplication): string {
   const config = app.get(ConfigService<AppEnvironment, true>);
   const prefix = config.get("API_PREFIX", { infer: true }).replace(/^\/+|\/+$/g, "");
@@ -40,8 +47,9 @@ export function configureApplication(app: INestApplication): string {
       origin: string | undefined,
       callback: (error: Error | null, allow?: boolean) => void
     ) {
-      if (!origin || allowedOrigins.has(origin)) return callback(null, true);
-      return callback(new Error("Origin is not allowed by CORS"), false);
+      // Do not turn a CORS policy decision into a 500. Browser reads are denied by
+      // omitting CORS headers; unsafe admin requests then receive the guard's 403.
+      return callback(null, isCorsOriginAllowed(origin, allowedOrigins));
     }
   });
   app.useGlobalPipes(

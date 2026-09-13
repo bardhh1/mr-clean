@@ -10,6 +10,7 @@ import { AdminUserEntity } from "../entities/admin-user.entity";
 import { AdminAuthService } from "./admin-auth.service";
 import { AdminMfaService } from "./admin-mfa.service";
 import { hashBootstrapToken, totpCode } from "./mfa";
+import type { AuditService } from "../../audit/audit.service";
 
 const bootstrapToken = "Ym9vdHN0cmFwLXRva2VuLXRlc3QtdmFsdWUtMzIhISE";
 
@@ -129,6 +130,7 @@ class MfaFixture {
       });
       this.sessions.push(session);
       return {
+        sessionId: session.id,
         accessToken: "access",
         refreshToken: "refresh",
         accessTokenMaxAgeMs: 1_000,
@@ -138,8 +140,13 @@ class MfaFixture {
     }
   } as unknown as AdminAuthService;
 
+  readonly audit = {
+    record: async () => undefined,
+    recordBestEffort: async () => undefined
+  } as unknown as AuditService;
+
   service(): AdminMfaService {
-    return new AdminMfaService(this.dataSource, this.config, this.auth);
+    return new AdminMfaService(this.dataSource, this.config, this.auth, this.audit);
   }
 
   owner(): AdminUserEntity {

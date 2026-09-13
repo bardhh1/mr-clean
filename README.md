@@ -38,7 +38,10 @@ npm run db:migrate
 npm run dev
 ```
 
-The API is versioned under `/api/v1`. OpenAPI is available at `/api/v1/docs`, and Railway readiness uses `/api/v1/health/ready`.
+The API is versioned under `/api/v1`. Production browsers use the same-origin Vercel
+`/api/v1` proxy; `VITE_API_BASE_URL` is a local-development override only. OpenAPI is
+available at `/api/v1/docs` outside production, and Railway readiness uses
+`/api/v1/health/ready`.
 
 Detailed implementation records live under `backend/docs/phases/`. Each completed phase explains its schema, endpoints, security decisions, Railway impact, and verification.
 

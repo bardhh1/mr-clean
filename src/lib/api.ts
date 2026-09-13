@@ -1,4 +1,6 @@
-const configuredBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)
+const configuredBaseUrl = (import.meta.env.PROD
+  ? "/api/v1"
+  : import.meta.env.VITE_API_BASE_URL as string | undefined)
   ?.trim()
   .replace(/\/+$/, "");
 
@@ -39,7 +41,7 @@ export async function apiRequest<T>(
   const shouldRefresh = response.status === 401
     && options.retryAuth !== false
     && path.startsWith("/admin/")
-    && !path.startsWith("/admin/auth/");
+    && !isAuthenticationStep(path);
 
   if (shouldRefresh && await refreshSession()) {
     return apiRequest<T>(path, { ...options, retryAuth: false });
@@ -48,6 +50,13 @@ export async function apiRequest<T>(
   if (!response.ok) throw await responseError(response);
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
+}
+
+function isAuthenticationStep(path: string): boolean {
+  return path === "/admin/auth/login"
+    || path === "/admin/auth/refresh"
+    || path === "/admin/auth/logout"
+    || path.startsWith("/admin/auth/mfa/");
 }
 
 export function invalidateAdminSessionRefresh(): void {
@@ -60,6 +69,10 @@ async function performRequest(path: string, options: ApiRequestOptions): Promise
   const headers = new Headers(requestOptions.headers);
   headers.set("accept", "application/json");
   headers.set("x-mr-clean-client", "mr-clean-web-v1");
+  if (isUnsafeMethod(requestOptions.method)) {
+    const csrfToken = readCookie("mr_clean_csrf");
+    if (csrfToken) headers.set("x-csrf-token", csrfToken);
+  }
 
   let body = requestedBody;
   if (body && !(body instanceof FormData) && typeof body !== "string") {
@@ -73,6 +86,20 @@ async function performRequest(path: string, options: ApiRequestOptions): Promise
     credentials: "include",
     headers
   });
+}
+
+function isUnsafeMethod(method: string | undefined): boolean {
+  return !["GET", "HEAD", "OPTIONS"].includes((method ?? "GET").toUpperCase());
+}
+
+function readCookie(name: string): string | undefined {
+  if (typeof document === "undefined") return undefined;
+  const prefix = `${encodeURIComponent(name)}=`;
+  return document.cookie
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(prefix))
+    ?.slice(prefix.length);
 }
 
 async function refreshSession(): Promise<boolean> {

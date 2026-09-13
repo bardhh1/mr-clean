@@ -24,8 +24,11 @@ export type AppEnvironment = {
   MFA_MAX_ATTEMPTS: number;
   MFA_MAX_ACTIVE_CHALLENGES: number;
   MFA_BOOTSTRAP_TTL_MINUTES: number;
+  CSRF_SECRET: string;
+  AUDIT_HMAC_KEY: string;
   AUTH_COOKIE_SECURE: boolean;
   AUTH_COOKIE_SAME_SITE: "lax" | "strict" | "none";
+  SWAGGER_ENABLED: boolean;
   AWS_ENDPOINT_URL: string;
   AWS_ACCESS_KEY_ID: string;
   AWS_SECRET_ACCESS_KEY: string;
@@ -58,8 +61,11 @@ const environmentSchema = Joi.object<AppEnvironment>({
   MFA_MAX_ATTEMPTS: Joi.number().integer().min(3).max(10).default(5),
   MFA_MAX_ACTIVE_CHALLENGES: Joi.number().integer().min(2).max(5).default(3),
   MFA_BOOTSTRAP_TTL_MINUTES: Joi.number().integer().min(5).max(60).default(15),
+  CSRF_SECRET: Joi.string().pattern(/^[A-Za-z0-9_-]{43}$/).required(),
+  AUDIT_HMAC_KEY: Joi.string().pattern(/^[A-Za-z0-9_-]{43}$/).required(),
   AUTH_COOKIE_SECURE: Joi.boolean().truthy("true").falsy("false").default(false),
   AUTH_COOKIE_SAME_SITE: Joi.string().valid("lax", "strict", "none").default("lax"),
+  SWAGGER_ENABLED: Joi.boolean().truthy("true").falsy("false").default(true),
   AWS_ENDPOINT_URL: Joi.string().uri({ scheme: ["https"] }).required(),
   AWS_ACCESS_KEY_ID: Joi.string().min(8).required(),
   AWS_SECRET_ACCESS_KEY: Joi.string().min(16).required(),
@@ -86,15 +92,19 @@ export function validateEnvironment(input: Record<string, unknown>): AppEnvironm
 
   assertEncodedSecret(validation.value.MFA_ENCRYPTION_KEY, "MFA_ENCRYPTION_KEY");
   assertEncodedSecret(validation.value.MFA_RECOVERY_PEPPER, "MFA_RECOVERY_PEPPER");
+  assertEncodedSecret(validation.value.CSRF_SECRET, "CSRF_SECRET");
+  assertEncodedSecret(validation.value.AUDIT_HMAC_KEY, "AUDIT_HMAC_KEY");
 
   const secrets = new Set([
     validation.value.JWT_ACCESS_SECRET,
     validation.value.MFA_ENCRYPTION_KEY,
-    validation.value.MFA_RECOVERY_PEPPER
+    validation.value.MFA_RECOVERY_PEPPER,
+    validation.value.CSRF_SECRET,
+    validation.value.AUDIT_HMAC_KEY
   ]);
-  if (secrets.size !== 3) {
+  if (secrets.size !== 5) {
     throw new Error(
-      "Invalid environment configuration: JWT_ACCESS_SECRET, MFA_ENCRYPTION_KEY, and MFA_RECOVERY_PEPPER must be distinct"
+      "Invalid environment configuration: JWT_ACCESS_SECRET, MFA_ENCRYPTION_KEY, MFA_RECOVERY_PEPPER, CSRF_SECRET, and AUDIT_HMAC_KEY must be distinct"
     );
   }
 
@@ -111,10 +121,15 @@ export function validateEnvironment(input: Record<string, unknown>): AppEnvironm
   if (validation.value.NODE_ENV === "production") {
     if (
       !validation.value.AUTH_COOKIE_SECURE
-      || validation.value.AUTH_COOKIE_SAME_SITE !== "none"
+      || validation.value.AUTH_COOKIE_SAME_SITE !== "strict"
     ) {
       throw new Error(
-        "Invalid environment configuration: production requires AUTH_COOKIE_SECURE=true and AUTH_COOKIE_SAME_SITE=none for the Vercel-to-Railway boundary"
+        "Invalid environment configuration: production requires AUTH_COOKIE_SECURE=true and AUTH_COOKIE_SAME_SITE=strict for the same-origin Vercel proxy boundary"
+      );
+    }
+    if (validation.value.SWAGGER_ENABLED) {
+      throw new Error(
+        "Invalid environment configuration: production requires SWAGGER_ENABLED=false"
       );
     }
     if (validation.value.ADMIN_LOGIN_MIN_DURATION_MS < 250) {

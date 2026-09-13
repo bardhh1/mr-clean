@@ -6,6 +6,11 @@ import type { CreateOrderDto } from "./dto/create-order.dto";
 import { OrderItemEntity } from "./entities/order-item.entity";
 import { OrderEntity } from "./entities/order.entity";
 import { OrdersService } from "./orders.service";
+import type { AuditService } from "../audit/audit.service";
+
+const audit = {
+  record: vi.fn().mockResolvedValue(undefined)
+} as unknown as AuditService;
 
 const input: CreateOrderDto = {
   idempotency_key: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
@@ -79,7 +84,7 @@ function transactionalService(productOverrides: Partial<ProductEntity> = {}) {
   } as unknown as DataSource;
 
   return {
-    service: new OrdersService(orders, dataSource),
+    service: new OrdersService(orders, dataSource, audit),
     transaction,
     orderRepository,
     itemRepository
@@ -139,7 +144,7 @@ function administrativeService(order: OrderEntity | null) {
   } as unknown as DataSource;
 
   return {
-    service: new OrdersService(orders, dataSource),
+    service: new OrdersService(orders, dataSource, audit),
     builder,
     transactionRepository
   };

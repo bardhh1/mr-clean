@@ -1,5 +1,9 @@
 # Phase 09 — Mandatory administrator MFA and secure recovery
 
+> Historical phase record: Phase 10 supersedes the cross-origin `SameSite=None` cookie
+> policy with a same-origin Vercel API proxy, `SameSite=Strict`, signed CSRF validation,
+> and production Swagger shutdown. Use the Phase 10 runbook for current deployment values.
+
 ## Outcome
 
 Phase 09 establishes the security boundary required before the owner dashboard grows into a business-critical system. The sole administrator cannot obtain a session with a password alone, and a stolen password cannot be used to claim the first authenticator factor.

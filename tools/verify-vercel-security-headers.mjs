@@ -12,7 +12,10 @@ const expectedHeaders = new Map([
   ["x-content-type-options", "nosniff"],
   ["referrer-policy", "no-referrer"],
   ["permissions-policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()"],
-  ["strict-transport-security", "max-age=63072000; includeSubDomains; preload"]
+  ["strict-transport-security", "max-age=63072000; includeSubDomains; preload"],
+  ["cross-origin-opener-policy", "same-origin"],
+  ["cross-origin-resource-policy", "same-origin"],
+  ["x-permitted-cross-domain-policies", "none"]
 ]);
 
 for (const [name, expected] of expectedHeaders) {
@@ -28,12 +31,17 @@ for (const directive of [
   "object-src 'none'",
   "frame-ancestors 'none'",
   "form-action 'self'",
-  "connect-src 'self' https://mr-clean-api-production.up.railway.app",
+  "connect-src 'self'",
   "upgrade-insecure-requests"
 ]) {
   if (!contentSecurityPolicy.split(";").map((value) => value.trim()).includes(directive)) {
     throw new Error(`Content-Security-Policy is missing: ${directive}`);
   }
+}
+
+const apiProxy = config.rewrites?.find((rule) => rule.source === "/api/v1/:path*");
+if (apiProxy?.destination !== "https://mr-clean-api-production.up.railway.app/api/v1/:path*") {
+  throw new Error("vercel.json must proxy /api/v1 through the production Railway API");
 }
 
 process.stdout.write("Vercel security-header contract passed.\n");

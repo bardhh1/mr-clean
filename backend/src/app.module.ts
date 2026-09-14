@@ -6,6 +6,7 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { ApiExceptionFilter } from "./common/filters/api-exception.filter";
 import { RailwayThrottlerGuard } from "./common/guards/railway-throttler.guard";
 import { RequestIdInterceptor } from "./common/interceptors/request-id.interceptor";
+import { BrowserSecurityModule } from "./common/security/browser-security.module";
 import { validateEnvironment } from "./config/env.validation";
 import { CatalogModule } from "./catalog/catalog.module";
 import { AdminModule } from "./admin/admin.module";
@@ -13,6 +14,7 @@ import { databaseOptions } from "./database/database.config";
 import { HealthModule } from "./health/health.module";
 import { OrdersModule } from "./orders/orders.module";
 import { StorageModule } from "./storage/storage.module";
+import { AuditModule } from "./audit/audit.module";
 
 @Module({
   imports: [
@@ -21,6 +23,8 @@ import { StorageModule } from "./storage/storage.module";
       cache: true,
       validate: validateEnvironment
     }),
+    BrowserSecurityModule,
+    AuditModule,
     ThrottlerModule.forRoot([
       {
         ttl: 60_000,

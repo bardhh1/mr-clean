@@ -1,5 +1,9 @@
 # Phase 06 — Railway and Vercel production deployment
 
+> Historical deployment record: Phase 10 supersedes the direct cross-origin browser/API
+> topology, production Swagger availability, `VITE_API_BASE_URL` production usage, and
+> `SameSite=None` cookie guidance below. Use the Phase 10 controlled rollout for current work.
+
 ## Outcome
 
 The Mr. Clean stack is live across two independent production boundaries:

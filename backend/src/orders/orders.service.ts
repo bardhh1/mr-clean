@@ -12,6 +12,7 @@ import { CreateOrderDto } from "./dto/create-order.dto";
 import { ListOrdersQueryDto } from "./dto/list-orders-query.dto";
 import { OrderItemEntity } from "./entities/order-item.entity";
 import { OrderEntity, type OrderStatus } from "./entities/order.entity";
+import { AuditService, emptyAuditContext, type AuditContext } from "../audit/audit.service";
 
 const allowedTransitions: Record<OrderStatus, readonly OrderStatus[]> = {
   pending_whatsapp: ["confirmed", "cancelled"],
@@ -25,7 +26,8 @@ export class OrdersService {
   constructor(
     @InjectRepository(OrderEntity)
     private readonly orders: Repository<OrderEntity>,
-    private readonly dataSource: DataSource
+    private readonly dataSource: DataSource,
+    private readonly audit: AuditService
   ) {}
 
   async create(input: CreateOrderDto) {
@@ -153,7 +155,11 @@ export class OrdersService {
     return adminOrder(order);
   }
 
-  async updateStatus(id: string, next: OrderStatus) {
+  async updateStatus(
+    id: string,
+    next: OrderStatus,
+    context: AuditContext = emptyAuditContext
+  ) {
     return this.dataSource.transaction(async (manager) => {
       const repository = manager.getRepository(OrderEntity);
       const order = await repository.findOne({
@@ -166,8 +172,17 @@ export class OrdersService {
         throw new ConflictException(`Order cannot move from ${order.status} to ${next}`);
       }
 
+      const previous = order.status;
       order.status = next;
-      return adminOrder(await repository.save(order));
+      const saved = await repository.save(order);
+      await this.audit.record({
+        ...context,
+        action: "orders.status_updated",
+        targetType: "order",
+        targetId: saved.id,
+        metadata: { from: previous, to: next, reference: saved.reference }
+      }, manager);
+      return adminOrder(saved);
     });
   }
 

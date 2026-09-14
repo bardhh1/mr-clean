@@ -5,6 +5,13 @@ import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import type { AppEnvironment } from "./config/env.validation";
 
+export function isCorsOriginAllowed(
+  origin: string | undefined,
+  allowedOrigins: ReadonlySet<string>
+): boolean {
+  return !origin || allowedOrigins.has(origin);
+}
+
 export function configureApplication(app: INestApplication): string {
   const config = app.get(ConfigService<AppEnvironment, true>);
   const prefix = config.get("API_PREFIX", { infer: true }).replace(/^\/+|\/+$/g, "");
@@ -14,8 +21,30 @@ export function configureApplication(app: INestApplication): string {
       .map((origin) => origin.trim())
       .filter(Boolean)
   );
+  const production = config.get("NODE_ENV", { infer: true }) === "production";
 
-  app.use(helmet({ contentSecurityPolicy: false }));
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: production ? {
+        defaultSrc: ["'none'"],
+        baseUri: ["'none'"],
+        formAction: ["'none'"],
+        frameAncestors: ["'none'"]
+      } : {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:"]
+      }
+    },
+    crossOriginResourcePolicy: { policy: "same-site" },
+    hsts: production ? {
+      maxAge: 63_072_000,
+      includeSubDomains: true,
+      preload: true
+    } : false,
+    referrerPolicy: { policy: "no-referrer" }
+  }));
   app.use(cookieParser());
   app.enableCors({
     credentials: true,
@@ -23,8 +52,9 @@ export function configureApplication(app: INestApplication): string {
       origin: string | undefined,
       callback: (error: Error | null, allow?: boolean) => void
     ) {
-      if (!origin || allowedOrigins.has(origin)) return callback(null, true);
-      return callback(new Error("Origin is not allowed by CORS"), false);
+      // Do not turn a CORS policy decision into a 500. Browser reads are denied by
+      // omitting CORS headers; unsafe admin requests then receive the guard's 403.
+      return callback(null, isCorsOriginAllowed(origin, allowedOrigins));
     }
   });
   app.useGlobalPipes(
@@ -38,16 +68,18 @@ export function configureApplication(app: INestApplication): string {
   app.setGlobalPrefix(prefix);
   app.enableShutdownHooks();
 
-  const openApi = new DocumentBuilder()
-    .setTitle("Mr. Clean API")
-    .setDescription("Catalog, administration, uploads, and order APIs for Mr. Clean.")
-    .setVersion("1.0")
-    .addBearerAuth()
-    .build();
-  const document = SwaggerModule.createDocument(app, openApi);
-  SwaggerModule.setup(`${prefix}/docs`, app, document, {
-    jsonDocumentUrl: `${prefix}/docs-json`
-  });
+  if (config.get("SWAGGER_ENABLED", { infer: true })) {
+    const openApi = new DocumentBuilder()
+      .setTitle("Mr. Clean API")
+      .setDescription("Catalog, administration, uploads, and order APIs for Mr. Clean.")
+      .setVersion("1.0")
+      .addBearerAuth()
+      .build();
+    const document = SwaggerModule.createDocument(app, openApi);
+    SwaggerModule.setup(`${prefix}/docs`, app, document, {
+      jsonDocumentUrl: `${prefix}/docs-json`
+    });
+  }
 
   return prefix;
 }

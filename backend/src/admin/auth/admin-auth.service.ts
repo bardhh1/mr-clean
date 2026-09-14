@@ -7,6 +7,11 @@ import { setTimeout as delay } from "node:timers/promises";
 import { DataSource, type EntityManager, IsNull, MoreThan, Not, Repository } from "typeorm";
 import type { AppEnvironment } from "../../config/env.validation";
 import {
+  AuditService,
+  emptyAuditContext,
+  type AuditContext
+} from "../../audit/audit.service";
+import {
   AdminSessionEntity,
   type SessionRevocationReason
 } from "../entities/admin-session.entity";
@@ -42,10 +47,15 @@ export class AdminAuthService {
     private readonly sessions: Repository<AdminSessionEntity>,
     private readonly dataSource: DataSource,
     private readonly jwt: JwtService,
-    private readonly config: ConfigService<AppEnvironment, true>
+    private readonly config: ConfigService<AppEnvironment, true>,
+    private readonly audit: AuditService
   ) {}
 
-  async verifyCredentials(email: string, password: string): Promise<AdminUserEntity> {
+  async verifyCredentials(
+    email: string,
+    password: string,
+    context: AuditContext = emptyAuditContext
+  ): Promise<AdminUserEntity> {
     const startedAt = Date.now();
     const normalizedEmail = email.trim().toLowerCase();
     const candidate = await this.users.findOne({
@@ -55,12 +65,32 @@ export class AdminAuthService {
       ? verifyPassword(password, candidate.password_hash)
       : verifyPassword(password, dummyPasswordHash);
 
-    if (!candidate) return this.rejectInvalidCredentials(startedAt);
+    if (!candidate) {
+      await this.audit.recordBestEffort({
+        ...context,
+        actorAdminUserId: null,
+        action: "auth.login.failed",
+        outcome: "failure",
+        targetType: "login_identity",
+        targetId: this.audit.hashIdentifier(normalizedEmail),
+        metadata: { stage: "password" }
+      });
+      return this.rejectInvalidCredentials(startedAt);
+    }
     if (candidate.locked_until && candidate.locked_until.getTime() > Date.now()) {
+      await this.audit.recordBestEffort({
+        ...context,
+        actorAdminUserId: null,
+        action: "auth.login.failed",
+        outcome: "failure",
+        targetType: "admin_user",
+        targetId: candidate.id,
+        metadata: { stage: "password", reason: "locked" }
+      });
       return this.rejectInvalidCredentials(startedAt);
     }
     if (!passwordMatches) {
-      await this.recordFailedLogin(candidate.id);
+      await this.recordFailedLogin(candidate.id, context);
       return this.rejectInvalidCredentials(startedAt);
     }
 
@@ -89,7 +119,18 @@ export class AdminAuthService {
       return user;
     });
 
-    if (!result) return this.rejectInvalidCredentials(startedAt);
+    if (!result) {
+      await this.audit.recordBestEffort({
+        ...context,
+        actorAdminUserId: null,
+        action: "auth.login.failed",
+        outcome: "failure",
+        targetType: "admin_user",
+        targetId: candidate.id,
+        metadata: { stage: "password", reason: "account_state_changed" }
+      });
+      return this.rejectInvalidCredentials(startedAt);
+    }
     return result;
   }
 
@@ -109,8 +150,19 @@ export class AdminAuthService {
     return this.issueResult(user, created.session, created.refreshToken);
   }
 
-  async refresh(refreshToken: string) {
-    const parsed = this.parseRefreshToken(refreshToken);
+  async refresh(refreshToken: string, context: AuditContext = emptyAuditContext) {
+    let parsed: { sessionId: string; secret: string };
+    try {
+      parsed = this.parseRefreshToken(refreshToken);
+    } catch (error) {
+      await this.audit.recordBestEffort({
+        ...context,
+        action: "auth.refresh.failed",
+        outcome: "failure",
+        metadata: { reason: "malformed" }
+      });
+      throw error;
+    }
     const outcome = await this.dataSource.transaction<RefreshOutcome>(async (manager) => {
       const sessionRepository = manager.getRepository(AdminSessionEntity);
       const userRepository = manager.getRepository(AdminUserEntity);
@@ -133,6 +185,15 @@ export class AdminAuthService {
       if (session.revoked_at) {
         if (session.revocation_reason === "rotated" && session.rotated_to_session_id) {
           await this.revokeFamily(sessionRepository, session.family_id, "reuse_detected");
+          await this.audit.record({
+            ...context,
+            actorAdminUserId: user.id,
+            sessionId: session.id,
+            action: "auth.refresh.reuse_detected",
+            outcome: "failure",
+            targetType: "session_family",
+            targetId: session.family_id
+          }, manager);
           return { kind: "reuse" };
         }
         return { kind: "invalid" };
@@ -169,6 +230,15 @@ export class AdminAuthService {
       });
       session.rotated_to_session_id = created.session.id;
       await sessionRepository.save(session);
+      await this.audit.record({
+        ...context,
+        actorAdminUserId: user.id,
+        sessionId: created.session.id,
+        action: "auth.session.refreshed",
+        targetType: "session",
+        targetId: created.session.id,
+        metadata: { previous_session_id: session.id }
+      }, manager);
 
       return { kind: "success", user, created };
     });
@@ -188,7 +258,10 @@ export class AdminAuthService {
     );
   }
 
-  async logout(refreshToken?: string): Promise<void> {
+  async logout(
+    refreshToken?: string,
+    context: AuditContext = emptyAuditContext
+  ): Promise<void> {
     if (!refreshToken) return;
 
     let parsed: { sessionId: string; secret: string };
@@ -217,10 +290,21 @@ export class AdminAuthService {
       if (!session || !this.matchesSecret(session.token_hash, parsed.secret)) return;
 
       await this.revokeActiveFamily(sessionRepository, session.family_id, "logout");
+      await this.audit.record({
+        ...context,
+        actorAdminUserId: user.id,
+        sessionId: session.id,
+        action: "auth.logout",
+        targetType: "session_family",
+        targetId: session.family_id
+      }, manager);
     });
   }
 
-  async logoutAll(adminUserId: string): Promise<void> {
+  async logoutAll(
+    adminUserId: string,
+    context: AuditContext = emptyAuditContext
+  ): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
       const user = await manager.getRepository(AdminUserEntity).findOne({
         where: { id: adminUserId },
@@ -237,6 +321,13 @@ export class AdminAuthService {
         .where("admin_user_id = :adminUserId", { adminUserId })
         .andWhere("revoked_at IS NULL")
         .execute();
+      await this.audit.record({
+        ...context,
+        actorAdminUserId: adminUserId,
+        action: "auth.logout_all",
+        targetType: "admin_user",
+        targetId: adminUserId
+      }, manager);
     });
   }
 
@@ -314,7 +405,7 @@ export class AdminAuthService {
     };
   }
 
-  private async recordFailedLogin(adminUserId: string): Promise<void> {
+  private async recordFailedLogin(adminUserId: string, context: AuditContext): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
       const repository = manager.getRepository(AdminUserEntity);
       const user = await repository.findOne({
@@ -338,6 +429,15 @@ export class AdminAuthService {
         user.locked_until = new Date(now.getTime() + minutes * 60_000);
       }
       await repository.save(user);
+      await this.audit.record({
+        ...context,
+        actorAdminUserId: null,
+        action: "auth.login.failed",
+        outcome: "failure",
+        targetType: "admin_user",
+        targetId: user.id,
+        metadata: { stage: "password" }
+      }, manager);
     });
   }
 
@@ -408,6 +508,7 @@ export class AdminAuthService {
     };
 
     return {
+      sessionId: session.id,
       accessToken: this.jwt.sign(payload, {
         algorithm: "HS256",
         audience: this.config.get("JWT_ACCESS_AUDIENCE", { infer: true }),

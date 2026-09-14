@@ -9,6 +9,7 @@ import { AdminSessionEntity } from "../entities/admin-session.entity";
 import { AdminUserEntity } from "../entities/admin-user.entity";
 import { AdminAuthService } from "./admin-auth.service";
 import { hashPassword } from "./password";
+import type { AuditContext, AuditService } from "../../audit/audit.service";
 
 const configuration: Record<keyof AppEnvironment, AppEnvironment[keyof AppEnvironment]> = {
   NODE_ENV: "test",
@@ -34,8 +35,11 @@ const configuration: Record<keyof AppEnvironment, AppEnvironment[keyof AppEnviro
   MFA_MAX_ATTEMPTS: 5,
   MFA_MAX_ACTIVE_CHALLENGES: 3,
   MFA_BOOTSTRAP_TTL_MINUTES: 15,
+  CSRF_SECRET: "Y3NyZi10ZXN0LXNlY3JldC12YWx1ZS0zMi1ieXRlcyE",
+  AUDIT_HMAC_KEY: "YXVkaXQtdGVzdC1oYXNoLWtleS12YWx1ZS0zMiEhISE",
   AUTH_COOKIE_SECURE: false,
   AUTH_COOKIE_SAME_SITE: "lax",
+  SWAGGER_ENABLED: true,
   AWS_ENDPOINT_URL: "https://storage.invalid",
   AWS_ACCESS_KEY_ID: "test-access-key",
   AWS_SECRET_ACCESS_KEY: "test-secret-key-value",
@@ -121,13 +125,22 @@ class AuthFixture {
     get: (key: keyof AppEnvironment) => configuration[key]
   } as unknown as ConfigService<AppEnvironment, true>;
 
+  readonly auditRecord = vi.fn().mockResolvedValue(undefined);
+  readonly auditRecordBestEffort = vi.fn().mockResolvedValue(undefined);
+  readonly audit = {
+    hashIdentifier: (value: string) => `hash:${value}`,
+    record: this.auditRecord,
+    recordBestEffort: this.auditRecordBestEffort
+  } as unknown as AuditService;
+
   service(): AdminAuthService {
     return new AdminAuthService(
       this.userRepository,
       this.sessionRepository,
       this.dataSource,
       this.jwt,
-      this.config
+      this.config,
+      this.audit
     );
   }
 
@@ -257,6 +270,65 @@ describe("AdminAuthService", () => {
     await expect(fixture.login(service, owner.email, "a-very-long-owner-password"))
       .rejects.toBeInstanceOf(UnauthorizedException);
     expect(fixture.sessions).toHaveLength(0);
+  });
+
+  it("keeps the administrator as the target, never the actor, for a wrong password", async () => {
+    const owner = fixture.owner();
+    const untrustedContext: AuditContext = {
+      actorAdminUserId: randomUUID(),
+      sessionId: null,
+      requestId: null,
+      ipHash: null,
+      userAgent: null
+    };
+
+    await expect(service.verifyCredentials(owner.email, "incorrect-password", untrustedContext))
+      .rejects.toBeInstanceOf(UnauthorizedException);
+
+    expect(fixture.auditRecord).toHaveBeenCalledOnce();
+    expect(fixture.auditRecord.mock.calls[0][0]).toMatchObject({
+      actorAdminUserId: null,
+      action: "auth.login.failed",
+      outcome: "failure",
+      targetType: "admin_user",
+      targetId: owner.id
+    });
+  });
+
+  it("keeps the administrator as the target, never the actor, while locked", async () => {
+    const owner = fixture.owner();
+    owner.locked_until = new Date(Date.now() + 60_000);
+
+    await expect(service.verifyCredentials(owner.email, "incorrect-password"))
+      .rejects.toBeInstanceOf(UnauthorizedException);
+
+    expect(fixture.auditRecordBestEffort).toHaveBeenCalledOnce();
+    expect(fixture.auditRecordBestEffort.mock.calls[0][0]).toMatchObject({
+      actorAdminUserId: null,
+      action: "auth.login.failed",
+      targetType: "admin_user",
+      targetId: owner.id,
+      metadata: { stage: "password", reason: "locked" }
+    });
+  });
+
+  it("keeps the administrator as the target when account state changes during login", async () => {
+    const owner = fixture.owner();
+    vi.spyOn(fixture.userRepository, "findOne")
+      .mockResolvedValueOnce(owner)
+      .mockResolvedValueOnce(null);
+
+    await expect(service.verifyCredentials(owner.email, "a-very-long-owner-password"))
+      .rejects.toBeInstanceOf(UnauthorizedException);
+
+    expect(fixture.auditRecordBestEffort).toHaveBeenCalledOnce();
+    expect(fixture.auditRecordBestEffort.mock.calls[0][0]).toMatchObject({
+      actorAdminUserId: null,
+      action: "auth.login.failed",
+      targetType: "admin_user",
+      targetId: owner.id,
+      metadata: { stage: "password", reason: "account_state_changed" }
+    });
   });
 
   it("pads both unknown-account and wrong-password failures to the configured duration", async () => {

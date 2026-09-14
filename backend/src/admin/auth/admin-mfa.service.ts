@@ -1,8 +1,13 @@
 import { HttpException, HttpStatus, Injectable, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { DataSource, IsNull, type Repository } from "typeorm";
 import type { AppEnvironment } from "../../config/env.validation";
+import {
+  AuditService,
+  emptyAuditContext,
+  type AuditContext
+} from "../../audit/audit.service";
 import { AdminMfaChallengeEntity } from "../entities/admin-mfa-challenge.entity";
 import { AdminMfaRecoveryCodeEntity } from "../entities/admin-mfa-recovery-code.entity";
 import { AdminSessionEntity } from "../entities/admin-session.entity";
@@ -28,7 +33,8 @@ export class AdminMfaService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly config: ConfigService<AppEnvironment, true>,
-    private readonly auth: AdminAuthService
+    private readonly auth: AdminAuthService,
+    private readonly audit: AuditService
   ) {}
 
   async begin(userSnapshot: AdminUserEntity): Promise<MfaLoginChallenge> {
@@ -93,8 +99,18 @@ export class AdminMfaService {
     });
   }
 
-  async bootstrap(challengeToken: string, bootstrapToken: string): Promise<MfaLoginChallenge> {
-    const parsed = this.parseChallengeToken(challengeToken);
+  async bootstrap(
+    challengeToken: string,
+    bootstrapToken: string,
+    context: AuditContext = emptyAuditContext
+  ): Promise<MfaLoginChallenge> {
+    let parsed: { challengeId: string; secret: string };
+    try {
+      parsed = this.parseChallengeToken(challengeToken);
+    } catch {
+      await this.recordMalformedChallenge("mfa_bootstrap", context);
+      throw new UnauthorizedException(genericMfaMessage);
+    }
     const outcome = await this.dataSource.transaction(async (manager) => {
       const challenges = manager.getRepository(AdminMfaChallengeEntity);
       const reference = await challenges.findOneBy({ id: parsed.challengeId });
@@ -171,6 +187,13 @@ export class AdminMfaService {
       user.mfa_bootstrap_expires_at = null;
       await users.save(user);
       await challenges.save(challenge);
+      await this.audit.record({
+        ...context,
+        actorAdminUserId: user.id,
+        action: "auth.mfa.bootstrap_authorized",
+        targetType: "admin_user",
+        targetId: user.id
+      }, manager);
 
       return {
         kind: "success" as const,
@@ -191,12 +214,30 @@ export class AdminMfaService {
       };
     });
 
-    if (outcome.kind !== "success") throw new UnauthorizedException(genericMfaMessage);
+    if (outcome.kind !== "success") {
+      await this.audit.recordBestEffort({
+        ...context,
+        action: "auth.login.failed",
+        outcome: "failure",
+        metadata: { stage: "mfa_bootstrap" }
+      });
+      throw new UnauthorizedException(genericMfaMessage);
+    }
     return outcome.response;
   }
 
-  async complete(challengeToken: string, code: string) {
-    const parsed = this.parseChallengeToken(challengeToken);
+  async complete(
+    challengeToken: string,
+    code: string,
+    context: AuditContext = emptyAuditContext
+  ) {
+    let parsed: { challengeId: string; secret: string };
+    try {
+      parsed = this.parseChallengeToken(challengeToken);
+    } catch {
+      await this.recordMalformedChallenge("mfa_verify", context);
+      throw new UnauthorizedException(genericMfaMessage);
+    }
     const outcome = await this.dataSource.transaction(async (manager) => {
       const challenges = manager.getRepository(AdminMfaChallengeEntity);
       const reference = await challenges.findOneBy({ id: parsed.challengeId });
@@ -315,6 +356,18 @@ export class AdminMfaService {
       await challenges.save(challenge);
 
       const session = await this.auth.createAuthenticatedSession(manager, user, now);
+      await this.audit.record({
+        ...context,
+        actorAdminUserId: user.id,
+        sessionId: session.sessionId,
+        action: "auth.login.succeeded",
+        targetType: "admin_user",
+        targetId: user.id,
+        metadata: {
+          factor: usedRecoveryCode ? "recovery_code" : "totp",
+          enrollment: challenge.purpose === "enrollment"
+        }
+      }, manager);
       return {
         kind: "success" as const,
         session,
@@ -323,11 +376,24 @@ export class AdminMfaService {
       };
     });
 
-    if (outcome.kind !== "success") throw new UnauthorizedException(genericMfaMessage);
+    if (outcome.kind !== "success") {
+      await this.audit.recordBestEffort({
+        ...context,
+        action: "auth.login.failed",
+        outcome: "failure",
+        metadata: { stage: "mfa_verify" }
+      });
+      throw new UnauthorizedException(genericMfaMessage);
+    }
     return outcome;
   }
 
-  async regenerateRecoveryCodes(adminUserId: string, sessionId: string, code: string) {
+  async regenerateRecoveryCodes(
+    adminUserId: string,
+    sessionId: string,
+    code: string,
+    context: AuditContext = emptyAuditContext
+  ) {
     const outcome = await this.dataSource.transaction(async (manager) => {
       const user = await manager.getRepository(AdminUserEntity).findOne({
         where: { id: adminUserId },
@@ -375,6 +441,14 @@ export class AdminMfaService {
       session.mfa_verified_at = now;
       await manager.getRepository(AdminUserEntity).save(user);
       await manager.getRepository(AdminSessionEntity).save(session);
+      await this.audit.record({
+        ...context,
+        actorAdminUserId: adminUserId,
+        sessionId,
+        action: "auth.recovery_codes.regenerated",
+        targetType: "admin_user",
+        targetId: adminUserId
+      }, manager);
       return {
         kind: "success" as const,
         recoveryCodes: await this.replaceRecoveryCodes(
@@ -419,6 +493,18 @@ export class AdminMfaService {
     return { challengeId, secret };
   }
 
+  private async recordMalformedChallenge(
+    stage: "mfa_bootstrap" | "mfa_verify",
+    context: AuditContext
+  ): Promise<void> {
+    await this.audit.recordBestEffort({
+      ...context,
+      action: "auth.login.failed",
+      outcome: "failure",
+      metadata: { stage, reason: "malformed_challenge" }
+    });
+  }
+
   private matchesChallengeSecret(expectedHash: string, secret: string): boolean {
     return this.matchesDigest(expectedHash, this.hashChallengeSecret(secret));
   }
@@ -430,8 +516,14 @@ export class AdminMfaService {
   }
 
   private hashChallengeSecret(secret: string): string {
-    // Challenge secrets are 256 random bits and are never user-selected passwords.
-    return createHash("sha256").update(secret).digest("hex");
+    const key = Buffer.from(
+      this.config.get("MFA_RECOVERY_PEPPER", { infer: true }),
+      "base64url"
+    );
+    return createHmac("sha256", key)
+      .update("mr-clean:mfa-challenge:v1\0")
+      .update(secret)
+      .digest("hex");
   }
 
   private maxAttempts(): number {

@@ -7,6 +7,8 @@ const validEnvironment = {
   JWT_ACCESS_SECRET: "a-test-secret-that-is-longer-than-thirty-two-characters",
   MFA_ENCRYPTION_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY",
   MFA_RECOVERY_PEPPER: "cmVjb3ZlcnktcGVwcGVyLXRlc3QtdmFsdWUtMzIhISE",
+  CSRF_SECRET: "Y3NyZi10ZXN0LXNlY3JldC12YWx1ZS0zMi1ieXRlcyE",
+  AUDIT_HMAC_KEY: "YXVkaXQtdGVzdC1oYXNoLWtleS12YWx1ZS0zMiEhISE",
   AWS_ENDPOINT_URL: "https://storage.invalid",
   AWS_ACCESS_KEY_ID: "test-access-key",
   AWS_SECRET_ACCESS_KEY: "test-secret-key-value",
@@ -54,6 +56,18 @@ describe("validateEnvironment", () => {
     })).toThrow("MFA_RECOVERY_PEPPER");
   });
 
+  it("requires canonical independent CSRF and audit HMAC secrets", () => {
+    expect(() => validateEnvironment({
+      ...validEnvironment,
+      CSRF_SECRET: "not-a-canonical-csrf-secret"
+    })).toThrow("CSRF_SECRET");
+
+    expect(() => validateEnvironment({
+      ...validEnvironment,
+      AUDIT_HMAC_KEY: validEnvironment.CSRF_SECRET
+    })).toThrow("must be distinct");
+  });
+
   it("requires independent JWT, encryption, and recovery secrets", () => {
     expect(() => validateEnvironment({
       ...validEnvironment,
@@ -68,13 +82,14 @@ describe("validateEnvironment", () => {
     })).toThrow("canonical HTTP(S) origins");
   });
 
-  it("requires the secure cross-site cookie policy in production", () => {
+  it("requires the secure same-origin cookie and Swagger policy in production", () => {
     expect(() => validateEnvironment({
       ...validEnvironment,
       NODE_ENV: "production",
       CORS_ORIGINS: "https://mr-clean.example",
       AUTH_COOKIE_SECURE: false,
-      AUTH_COOKIE_SAME_SITE: "lax"
+      AUTH_COOKIE_SAME_SITE: "strict",
+      SWAGGER_ENABLED: false
     })).toThrow("production requires AUTH_COOKIE_SECURE=true");
 
     expect(validateEnvironment({
@@ -82,11 +97,22 @@ describe("validateEnvironment", () => {
       NODE_ENV: "production",
       CORS_ORIGINS: "https://mr-clean.example",
       AUTH_COOKIE_SECURE: true,
-      AUTH_COOKIE_SAME_SITE: "none"
+      AUTH_COOKIE_SAME_SITE: "strict",
+      SWAGGER_ENABLED: false
     })).toMatchObject({
       AUTH_COOKIE_SECURE: true,
-      AUTH_COOKIE_SAME_SITE: "none"
+      AUTH_COOKIE_SAME_SITE: "strict",
+      SWAGGER_ENABLED: false
     });
+
+    expect(() => validateEnvironment({
+      ...validEnvironment,
+      NODE_ENV: "production",
+      CORS_ORIGINS: "https://mr-clean.example",
+      AUTH_COOKIE_SECURE: true,
+      AUTH_COOKIE_SAME_SITE: "strict",
+      SWAGGER_ENABLED: true
+    })).toThrow("SWAGGER_ENABLED=false");
   });
 
   it("rejects an absolute session lifetime shorter than the rolling lifetime", () => {

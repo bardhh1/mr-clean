@@ -62,5 +62,13 @@
     "typescript": "6.0.3",
     "typescript-eslint": "8.67.0",
     "vitest": "4.1.11"
+  },
+  "overrides": {
+    "@nestjs/platform-express": {
+      "multer": "2.3.0"
+    },
+    "cosmiconfig": {
+      "js-yaml": "4.3.2"
+    }
   }
 }

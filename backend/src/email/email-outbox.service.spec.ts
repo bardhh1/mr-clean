@@ -102,6 +102,35 @@ describe("EmailOutboxService", () => {
     expect(parameters[3]).toMatch(/^[0-9a-f-]{36}$/);
   });
 
+  it("unwraps PostgreSQL UPDATE RETURNING results before handing jobs to the worker", async () => {
+    const claimed = [{ id: "job-1", attempts: 1 }] as EmailOutboxEntity[];
+    const query = vi.fn()
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce([claimed, claimed.length]);
+    const manager = { query } as unknown as EntityManager;
+    const outbox = {
+      manager: {
+        transaction: vi.fn((callback: (manager: EntityManager) => unknown) => callback(manager))
+      }
+    } as unknown as Repository<EmailOutboxEntity>;
+
+    await expect(new EmailOutboxService(outbox, config).claimBatch()).resolves.toEqual(claimed);
+  });
+
+  it("unwraps an empty PostgreSQL UPDATE RETURNING result", async () => {
+    const query = vi.fn()
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce([[], 0]);
+    const manager = { query } as unknown as EntityManager;
+    const outbox = {
+      manager: {
+        transaction: vi.fn((callback: (manager: EntityManager) => unknown) => callback(manager))
+      }
+    } as unknown as Repository<EmailOutboxEntity>;
+
+    await expect(new EmailOutboxService(outbox, config).claimBatch()).resolves.toEqual([]);
+  });
+
   it("marks a leased job sent only when the lease still belongs to this worker", async () => {
     const builder = updateBuilder();
     const outbox = {

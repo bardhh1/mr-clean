@@ -58,7 +58,7 @@ export class EmailOutboxService {
           AND "attempts" >= $2
       `, [lockTimeout, maxAttempts]);
 
-      return manager.query<EmailOutboxEntity[]>(`
+      const result = await manager.query<EmailOutboxEntity[] | [EmailOutboxEntity[], number]>(`
         WITH candidates AS (
           SELECT "id"
           FROM "email_outbox"
@@ -80,6 +80,8 @@ export class EmailOutboxService {
         WHERE job."id" = candidates."id"
         RETURNING job.*
       `, [lockTimeout, maxAttempts, batchSize, lockToken]);
+
+      return isPostgresUpdateResult(result) ? result[0] : result;
     });
   }
 
@@ -159,4 +161,10 @@ export class EmailOutboxService {
 
 function sanitizeError(error: string): string {
   return error.replace(/\s+/g, " ").trim().slice(0, 1_000) || "Email delivery failed";
+}
+
+function isPostgresUpdateResult(
+  result: EmailOutboxEntity[] | [EmailOutboxEntity[], number]
+): result is [EmailOutboxEntity[], number] {
+  return result.length === 2 && Array.isArray(result[0]) && typeof result[1] === "number";
 }

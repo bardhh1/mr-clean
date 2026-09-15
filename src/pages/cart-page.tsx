@@ -49,7 +49,7 @@ export function CartPage() {
             <p><span>Nëntotali</span><strong>{formatCurrency(subtotal)}</strong></p>
             <p className="order-summary__total"><span>Totali</span><strong>{formatCurrency(subtotal)}</strong></p>
             <span className="locator-bar" aria-hidden="true" />
-            <small>Stoku, transporti dhe totali final konfirmohen nga ekipi ynë.</small>
+            <small>Totali llogaritet përsëri nga serveri; ekipi ynë konfirmon stokun dhe transportin.</small>
             <Link to="/checkout" className="poster-cta poster-cta--light">Vazhdo te porosia<ArrowRight aria-hidden="true" /></Link>
           </aside>
         </div>

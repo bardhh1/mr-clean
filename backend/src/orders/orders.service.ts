@@ -1,23 +1,31 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
+  HttpStatus,
   Injectable,
   NotFoundException
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { createHash, randomUUID } from "node:crypto";
-import { DataSource, In, QueryFailedError, Repository } from "typeorm";
+import { DataSource, EntityManager, In, QueryFailedError, Repository } from "typeorm";
 import { ProductEntity } from "../catalog/entities/product.entity";
 import { CreateOrderDto } from "./dto/create-order.dto";
 import { ListOrdersQueryDto } from "./dto/list-orders-query.dto";
 import { OrderItemEntity } from "./entities/order-item.entity";
 import { OrderEntity, type OrderStatus } from "./entities/order.entity";
 import { AuditService, emptyAuditContext, type AuditContext } from "../audit/audit.service";
+import { EmailOutboxService } from "../email/email-outbox.service";
+import { TurnstileService } from "../common/security/turnstile.service";
+import { ConfigService } from "@nestjs/config";
+import type { AppEnvironment } from "../config/env.validation";
 
 const allowedTransitions: Record<OrderStatus, readonly OrderStatus[]> = {
-  pending_whatsapp: ["confirmed", "cancelled"],
-  confirmed: ["completed", "cancelled"],
-  completed: [],
+  pending: ["confirmed", "cancelled"],
+  confirmed: ["processing", "cancelled"],
+  processing: ["shipped", "cancelled"],
+  shipped: ["delivered", "cancelled"],
+  delivered: [],
   cancelled: []
 };
 
@@ -27,7 +35,10 @@ export class OrdersService {
     @InjectRepository(OrderEntity)
     private readonly orders: Repository<OrderEntity>,
     private readonly dataSource: DataSource,
-    private readonly audit: AuditService
+    private readonly audit: AuditService,
+    private readonly emailOutbox: EmailOutboxService,
+    private readonly turnstile: TurnstileService,
+    private readonly config: ConfigService<AppEnvironment, true>
   ) {}
 
   async create(input: CreateOrderDto) {
@@ -35,12 +46,26 @@ export class OrdersService {
     const requestHash = hashOrderRequest(normalized);
     const existing = await this.orders.findOneBy({ idempotency_key: normalized.idempotency_key });
     if (existing) return this.resolveIdempotent(existing, requestHash);
+    await this.turnstile.verify(input.turnstile_token);
 
     try {
       const order = await this.dataSource.transaction(async (manager) => {
         const productRepository = manager.getRepository(ProductEntity);
         const orderRepository = manager.getRepository(OrderEntity);
         const itemRepository = manager.getRepository(OrderItemEntity);
+        await manager.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
+          "mr-clean:checkout-volume"
+        ]);
+        const concurrentExisting = await orderRepository.findOneBy({
+          idempotency_key: normalized.idempotency_key
+        });
+        if (concurrentExisting) {
+          if (concurrentExisting.request_hash !== requestHash) {
+            throw new ConflictException("Idempotency key was already used for another order");
+          }
+          return concurrentExisting;
+        }
+        await this.enforceOrderVolumeLimits(manager, normalized.customer_email);
         const productIds = normalized.items.map((item) => item.product_id);
         const products = await productRepository.find({
           where: { id: In(productIds) },
@@ -82,11 +107,14 @@ export class OrdersService {
           customer_name: normalized.customer_name,
           company_name: normalized.company_name,
           phone: normalized.phone,
+          customer_email: normalized.customer_email,
           city: normalized.city,
           address: normalized.address,
           notes: normalized.notes,
-          payment_preference: normalized.payment_preference,
-          status: "pending_whatsapp",
+          payment_preference: "cash_on_delivery",
+          legacy_payment_preference: null,
+          checkout_version: 2,
+          status: "pending",
           total_cents: total,
           currency: "EUR"
         });
@@ -101,6 +129,7 @@ export class OrdersService {
           unit_price_cents: line.product.price_cents,
           line_total_cents: line.lineTotal
         })));
+        await this.emailOutbox.enqueueOrderCreated(manager, saved, saved.items);
         return saved;
       });
 
@@ -128,7 +157,8 @@ export class OrdersService {
     if (query.search?.trim()) {
       builder.andWhere(
         `(purchase.reference ILIKE :search OR purchase.customer_name ILIKE :search
-          OR purchase.company_name ILIKE :search OR purchase.phone ILIKE :search)`,
+          OR purchase.company_name ILIKE :search OR purchase.phone ILIKE :search
+          OR purchase.customer_email ILIKE :search)`,
         { search: `%${query.search.trim()}%` }
       );
     }
@@ -182,6 +212,7 @@ export class OrdersService {
         targetId: saved.id,
         metadata: { from: previous, to: next, reference: saved.reference }
       }, manager);
+      await this.emailOutbox.enqueueOrderStatusChanged(manager, saved, previous);
       return adminOrder(saved);
     });
   }
@@ -192,6 +223,38 @@ export class OrdersService {
     }
     return publicReceipt(order);
   }
+
+  private async enforceOrderVolumeLimits(
+    manager: EntityManager,
+    customerEmail: string
+  ): Promise<void> {
+    const [counts] = await manager.query<Array<{
+      global_count: number;
+      recipient_count: number;
+    }>>(`
+      SELECT
+        count(*) FILTER (
+          WHERE "created_at" >= clock_timestamp() - interval '1 hour'
+        )::int AS "global_count",
+        count(*) FILTER (
+          WHERE "created_at" >= clock_timestamp() - interval '1 day'
+            AND lower("customer_email") = lower($1)
+        )::int AS "recipient_count"
+      FROM "orders"
+      WHERE "checkout_version" = 2
+        AND "created_at" >= clock_timestamp() - interval '1 day'
+    `, [customerEmail]);
+    if (
+      !counts
+      || counts.global_count >= this.config.get("ORDER_GLOBAL_LIMIT_PER_HOUR", { infer: true })
+      || counts.recipient_count >= this.config.get("ORDER_RECIPIENT_LIMIT_PER_DAY", { infer: true })
+    ) {
+      throw new HttpException(
+        "Order capacity is temporarily unavailable. Please retry later.",
+        HttpStatus.TOO_MANY_REQUESTS
+      );
+    }
+  }
 }
 
 function normalizeInput(input: CreateOrderDto) {
@@ -200,10 +263,11 @@ function normalizeInput(input: CreateOrderDto) {
     customer_name: input.customer_name.trim(),
     company_name: input.company_name?.trim() || null,
     phone: input.phone.trim(),
+    customer_email: input.customer_email.trim().toLowerCase(),
     city: input.city.trim(),
     address: input.address.trim(),
     notes: input.notes?.trim() || null,
-    payment_preference: input.payment_preference,
+    payment_preference: "cash_on_delivery" as const,
     items: input.items.map((item) => ({
       product_id: item.product_id,
       quantity: item.quantity
@@ -241,10 +305,13 @@ function adminOrder(order: OrderEntity) {
     customer_name: order.customer_name,
     company_name: order.company_name,
     phone: order.phone,
+    customer_email: order.customer_email,
     city: order.city,
     address: order.address,
     notes: order.notes,
     payment_preference: order.payment_preference,
+    legacy_payment_preference: order.legacy_payment_preference,
+    checkout_version: order.checkout_version,
     status: order.status,
     total_cents: order.total_cents,
     currency: order.currency,

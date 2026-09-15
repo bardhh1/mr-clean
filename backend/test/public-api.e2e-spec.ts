@@ -3,6 +3,7 @@ import { Test } from "@nestjs/testing";
 import { randomUUID } from "node:crypto";
 import type { Server } from "node:http";
 import request from "supertest";
+import { DataSource } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AppModule } from "../src/app.module";
 import { configureApplication } from "../src/configure-application";
@@ -37,6 +38,7 @@ type OrderReceipt = {
 describe("Public API (e2e)", () => {
   let app: INestApplication;
   let server: Server;
+  let database: DataSource;
   let orderableProduct: PublicProduct;
 
   beforeAll(async () => {
@@ -46,6 +48,7 @@ describe("Public API (e2e)", () => {
     configureApplication(app);
     await app.init();
     server = app.getHttpServer() as Server;
+    database = app.get(DataSource);
 
     const products = await request(server)
       .get("/api/v1/products?limit=100")
@@ -123,6 +126,7 @@ describe("Public API (e2e)", () => {
       customer_name: "CI Verification",
       company_name: "Mr. Clean CI",
       phone: "+38344111222",
+      customer_email: "buyer@example.com",
       city: "Prishtinë",
       address: "CI ephemeral database",
       notes: "Deleted with the ephemeral PostgreSQL service",
@@ -136,17 +140,50 @@ describe("Public API (e2e)", () => {
       .expect(201);
     const receipt = created.body as OrderReceipt;
     expect(receipt).toMatchObject({
-      status: "pending_whatsapp",
+      status: "pending",
       total_cents: orderableProduct.price_cents,
       currency: "EUR"
     });
     expect(receipt.reference).toMatch(/^MC-[A-Z0-9]{12}$/);
+
+    const outbox = await database.query<Array<{
+      event_type: string;
+      recipient: string;
+      status: string;
+    }>>(`
+      SELECT "event_type", "recipient", "status"
+      FROM "email_outbox"
+      WHERE "aggregate_id" = $1
+      ORDER BY "event_type" ASC
+    `, [receipt.id]);
+    expect(outbox).toEqual([
+      { event_type: "order.created.owner", recipient: "owner@example.com", status: "pending" }
+    ]);
+
+    await expect(database.query(
+      `UPDATE "orders" SET "total_cents" = "total_cents" + 1 WHERE "id" = $1`,
+      [receipt.id]
+    )).rejects.toThrow("order financial snapshots are immutable");
+    await expect(database.query(
+      `UPDATE "order_items" SET "unit_price_cents" = "unit_price_cents" + 1 WHERE "order_id" = $1`,
+      [receipt.id]
+    )).rejects.toThrow("order item snapshots are immutable");
 
     const repeated = await request(server)
       .post("/api/v1/orders")
       .send(payload)
       .expect(201);
     expect((repeated.body as OrderReceipt).id).toBe(receipt.id);
+
+    await request(server)
+      .post("/api/v1/orders")
+      .send({ ...payload, idempotency_key: randomUUID(), payment_preference: "bank_transfer" })
+      .expect(400);
+
+    await request(server)
+      .post("/api/v1/orders")
+      .send({ ...payload, idempotency_key: randomUUID(), customer_email: undefined })
+      .expect(400);
 
     await request(server)
       .post("/api/v1/orders")

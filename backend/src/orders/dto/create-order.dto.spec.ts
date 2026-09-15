@@ -8,6 +8,7 @@ const validInput = {
   idempotency_key: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
   customer_name: "Arta Hoxha",
   phone: "+383 44 123 456",
+  customer_email: "arta@example.com",
   city: "Prishtinë",
   address: "Rruga e Testit 10",
   payment_preference: "cash",
@@ -39,5 +40,31 @@ describe("CreateOrderDto", () => {
     expect(errors.map((error) => error.property)).toEqual(
       expect.arrayContaining(["customer_name", "items"])
     );
+  });
+
+  it("requires customer email and rejects bank transfer", async () => {
+    const input = plainToInstance(CreateOrderDto, {
+      ...validInput,
+      customer_email: "not-an-email",
+      payment_preference: "bank_transfer"
+    });
+
+    expect((await validate(input)).map((error) => error.property)).toEqual(
+      expect.arrayContaining(["customer_email", "payment_preference"])
+    );
+  });
+
+  it("accepts a bounded Turnstile token and rejects oversized values", async () => {
+    const accepted = plainToInstance(CreateOrderDto, {
+      ...validInput,
+      turnstile_token: "provider-token"
+    });
+    expect(await validate(accepted)).toHaveLength(0);
+
+    const oversized = plainToInstance(CreateOrderDto, {
+      ...validInput,
+      turnstile_token: "x".repeat(2_049)
+    });
+    expect((await validate(oversized)).map((error) => error.property)).toContain("turnstile_token");
   });
 });

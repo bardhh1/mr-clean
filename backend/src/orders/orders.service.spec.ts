@@ -1,22 +1,42 @@
 import { BadRequestException, ConflictException } from "@nestjs/common";
 import type { DataSource, EntityManager, Repository } from "typeorm";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ProductEntity } from "../catalog/entities/product.entity";
 import type { CreateOrderDto } from "./dto/create-order.dto";
 import { OrderItemEntity } from "./entities/order-item.entity";
 import { OrderEntity } from "./entities/order.entity";
 import { OrdersService } from "./orders.service";
 import type { AuditService } from "../audit/audit.service";
+import type { EmailOutboxService } from "../email/email-outbox.service";
+import type { TurnstileService } from "../common/security/turnstile.service";
+import type { ConfigService } from "@nestjs/config";
+import type { AppEnvironment } from "../config/env.validation";
 
 const audit = {
   record: vi.fn().mockResolvedValue(undefined)
 } as unknown as AuditService;
+const enqueueOrderCreated = vi.fn().mockResolvedValue(undefined);
+const enqueueOrderStatusChanged = vi.fn().mockResolvedValue(undefined);
+const emailOutbox = {
+  enqueueOrderCreated,
+  enqueueOrderStatusChanged
+} as unknown as EmailOutboxService;
+const verifyTurnstile = vi.fn().mockResolvedValue(undefined);
+const turnstile = { verify: verifyTurnstile } as unknown as TurnstileService;
+const orderLimits: Partial<AppEnvironment> = {
+  ORDER_GLOBAL_LIMIT_PER_HOUR: 60,
+  ORDER_RECIPIENT_LIMIT_PER_DAY: 3
+};
+const config = {
+  get: vi.fn((key: keyof AppEnvironment) => orderLimits[key])
+} as unknown as ConfigService<AppEnvironment, true>;
 
 const input: CreateOrderDto = {
   idempotency_key: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
   customer_name: "Arta Hoxha",
   company_name: "Hotel Arta",
   phone: "+383 44 123 456",
+  customer_email: "arta@example.com",
   city: "Prishtinë",
   address: "Rruga e Testit 10",
   notes: "Recepsioni",
@@ -55,7 +75,8 @@ function transactionalService(productOverrides: Partial<ProductEntity> = {}) {
   });
   const orderRepository = {
     create: createOrder,
-    save: saveOrder
+    save: saveOrder,
+    findOneBy: vi.fn().mockResolvedValue(null)
   };
   const createItem = vi.fn(
     (value: Partial<OrderItemEntity>): OrderItemEntity => value as OrderItemEntity
@@ -67,7 +88,11 @@ function transactionalService(productOverrides: Partial<ProductEntity> = {}) {
     create: createItem,
     save: saveItems
   };
+  const managerQuery = vi.fn()
+    .mockResolvedValueOnce([])
+    .mockResolvedValueOnce([{ global_count: 0, recipient_count: 0 }]);
   const manager = {
+    query: managerQuery,
     getRepository(entity: unknown) {
       if (entity === ProductEntity) return productRepository;
       if (entity === OrderEntity) return orderRepository;
@@ -84,14 +109,16 @@ function transactionalService(productOverrides: Partial<ProductEntity> = {}) {
   } as unknown as DataSource;
 
   return {
-    service: new OrdersService(orders, dataSource, audit),
+    service: new OrdersService(orders, dataSource, audit, emailOutbox, turnstile, config),
     transaction,
+    manager,
+    managerQuery,
     orderRepository,
     itemRepository
   };
 }
 
-function existingOrder(status: OrderEntity["status"] = "pending_whatsapp"): OrderEntity {
+function existingOrder(status: OrderEntity["status"] = "pending"): OrderEntity {
   return {
     id: "31111111-1111-4111-8111-111111111111",
     reference: "MC-TESTREFERENCE",
@@ -100,10 +127,13 @@ function existingOrder(status: OrderEntity["status"] = "pending_whatsapp"): Orde
     customer_name: input.customer_name,
     company_name: input.company_name ?? null,
     phone: input.phone,
+    customer_email: input.customer_email,
     city: input.city,
     address: input.address,
     notes: input.notes ?? null,
-    payment_preference: input.payment_preference,
+    payment_preference: "cash_on_delivery",
+    legacy_payment_preference: null,
+    checkout_version: 2,
     status,
     total_cents: 1_780,
     currency: "EUR",
@@ -135,6 +165,7 @@ function administrativeService(order: OrderEntity | null) {
     save: vi.fn().mockImplementation((value: OrderEntity) => Promise.resolve(value))
   };
   const manager = {
+    query: vi.fn(),
     getRepository: vi.fn().mockReturnValue(transactionRepository)
   } as unknown as EntityManager;
   const dataSource = {
@@ -144,24 +175,33 @@ function administrativeService(order: OrderEntity | null) {
   } as unknown as DataSource;
 
   return {
-    service: new OrdersService(orders, dataSource, audit),
+    service: new OrdersService(orders, dataSource, audit, emailOutbox, turnstile, config),
     builder,
     transactionRepository
   };
 }
 
 describe("OrdersService", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("prices and snapshots the order from PostgreSQL inside one transaction", async () => {
     const { service, orderRepository, itemRepository } = transactionalService();
 
     const receipt = await service.create(input);
 
     expect(receipt.total_cents).toBe(1_780);
-    expect(receipt.status).toBe("pending_whatsapp");
+    expect(receipt.status).toBe("pending");
     expect(orderRepository.create).toHaveBeenCalledWith(expect.objectContaining({
       total_cents: 1_780,
-      customer_name: "Arta Hoxha"
+      customer_name: "Arta Hoxha",
+      customer_email: "arta@example.com",
+      payment_preference: "cash_on_delivery",
+      checkout_version: 2
     }));
+    expect(enqueueOrderCreated).toHaveBeenCalledOnce();
+    expect(verifyTurnstile).toHaveBeenCalledOnce();
     expect(itemRepository.create).toHaveBeenCalledWith(expect.objectContaining({
       name_snapshot: "Detergjent dyshemeje 5L",
       unit_price_cents: 890,
@@ -178,6 +218,7 @@ describe("OrdersService", () => {
 
     expect(second).toEqual(first);
     expect(transaction).toHaveBeenCalledTimes(1);
+    expect(verifyTurnstile).toHaveBeenCalledTimes(1);
   });
 
   it("rejects reuse of an idempotency key with a different cart", async () => {
@@ -196,11 +237,22 @@ describe("OrdersService", () => {
     await expect(service.create(input)).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it("enforces the serialized application-wide order budget", async () => {
+    const { service, managerQuery } = transactionalService();
+    managerQuery
+      .mockReset()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ global_count: 60, recipient_count: 0 }]);
+
+    await expect(service.create(input)).rejects.toMatchObject({ status: 429 });
+    expect(enqueueOrderCreated).not.toHaveBeenCalled();
+  });
+
   it("lists and searches orders with stable pagination metadata", async () => {
     const { service, builder } = administrativeService(existingOrder());
 
     const result = await service.list({
-      status: "pending_whatsapp",
+      status: "pending",
       search: " Arta ",
       limit: 1,
       offset: 0
@@ -227,9 +279,10 @@ describe("OrdersService", () => {
       .resolves.toMatchObject({ status: "confirmed" });
     await expect(service.updateStatus(order.id, "confirmed"))
       .resolves.toMatchObject({ status: "confirmed" });
-    await expect(service.updateStatus(order.id, "pending_whatsapp"))
+    await expect(service.updateStatus(order.id, "pending"))
       .rejects.toBeInstanceOf(ConflictException);
     expect(transactionRepository.save).toHaveBeenCalledOnce();
+    expect(enqueueOrderStatusChanged).toHaveBeenCalledOnce();
 
     await expect(administrativeService(null).service.updateStatus(order.id, "confirmed"))
       .rejects.toMatchObject({ status: 404 });

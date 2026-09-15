@@ -31,6 +31,8 @@ for (const directive of [
   "object-src 'none'",
   "frame-ancestors 'none'",
   "form-action 'self'",
+  "script-src 'self' https://challenges.cloudflare.com",
+  "frame-src https://challenges.cloudflare.com",
   "connect-src 'self'",
   "upgrade-insecure-requests"
 ]) {

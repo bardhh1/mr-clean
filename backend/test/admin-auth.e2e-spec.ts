@@ -257,6 +257,7 @@ describe("Single-owner authentication (e2e)", () => {
         idempotency_key: randomTestUuid(),
         customer_name: "Phase 10 Audit Verification",
         phone: "+38344111222",
+        customer_email: "buyer@example.com",
         city: "Prishtinë",
         address: "Disposable PostgreSQL test",
         payment_preference: "cash",
@@ -271,6 +272,20 @@ describe("Single-owner authentication (e2e)", () => {
       .set("x-csrf-token", finalCsrfToken)
       .send({ status: "confirmed" })
       .expect(200);
+
+    const statusNotifications = await database.query<Array<{
+      event_type: string;
+      status: string;
+    }>>(`
+      SELECT "event_type", "status"
+      FROM "email_outbox"
+      WHERE "aggregate_id" = $1 AND "event_type" LIKE 'order.status.%'
+      ORDER BY "event_type" ASC
+    `, [createdOrderId]);
+    expect(statusNotifications).toEqual([
+      { event_type: "order.status.customer", status: "pending" },
+      { event_type: "order.status.owner", status: "pending" }
+    ]);
 
     await browser
       .post("/api/v1/admin/auth/logout-all")
@@ -312,7 +327,6 @@ describe("Single-owner authentication (e2e)", () => {
       `DELETE FROM admin_audit_events WHERE id = $1`,
       [immutableId]
     )).rejects.toThrow("append-only");
-    await database.query(`DELETE FROM orders WHERE id = $1`, [createdOrderId]);
   });
 });
 

@@ -95,6 +95,11 @@ jobs:
       PORT: 3000
       API_PREFIX: api/v1
       CORS_ORIGINS: http://localhost:5173
+      TURNSTILE_ENABLED: "false"
+      TURNSTILE_SECRET_KEY: ""
+      TURNSTILE_EXPECTED_HOSTNAMES: localhost
+      ORDER_GLOBAL_LIMIT_PER_HOUR: 60
+      ORDER_RECIPIENT_LIMIT_PER_DAY: 3
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mr_clean_test
       DATABASE_SSL: "false"
       DATABASE_POOL_MAX: 5
@@ -116,6 +121,9 @@ jobs:
       AUTH_COOKIE_SECURE: "false"
       AUTH_COOKIE_SAME_SITE: lax
       SWAGGER_ENABLED: "true"
+      EMAIL_DELIVERY_ENABLED: "false"
+      EMAIL_FROM: Mr. Clean <orders@example.com>
+      ORDER_OWNER_EMAIL: owner@example.com
       AWS_ENDPOINT_URL: https://storage.invalid
       AWS_ACCESS_KEY_ID: ci-access-key
       AWS_SECRET_ACCESS_KEY: ci-secret-key-not-used-outside-tests

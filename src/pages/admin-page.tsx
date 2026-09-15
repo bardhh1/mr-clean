@@ -29,7 +29,30 @@ import { getAdminCategories, getAdminProducts } from "@/lib/catalog";
 import { formatCurrency } from "@/lib/format";
 import { getOrders, updateOrderStatus } from "@/lib/orders";
 import { hasApiConfig } from "@/lib/api";
-import type { Category, OrderRecord, Product } from "@/lib/types";
+import type { Category, OrderRecord, OrderStatus, Product } from "@/lib/types";
+
+const nextOrderStatus: Partial<Record<OrderStatus, OrderStatus>> = {
+  pending: "confirmed",
+  confirmed: "processing",
+  processing: "shipped",
+  shipped: "delivered"
+};
+
+const orderStatusLabels: Record<OrderStatus, string> = {
+  pending: "Në pritje",
+  confirmed: "E konfirmuar",
+  processing: "Në përgatitje",
+  shipped: "E nisur",
+  delivered: "E dorëzuar",
+  cancelled: "E anuluar"
+};
+
+const orderActionLabels: Partial<Record<OrderStatus, string>> = {
+  pending: "Konfirmo",
+  confirmed: "Fillo përgatitjen",
+  processing: "Nis për dorëzim",
+  shipped: "Shëno të dorëzuar"
+};
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -295,20 +318,29 @@ export function AdminPage() {
   }
 
   async function advanceOrder(order: OrderRecord) {
-    const next = order.status === "pending_whatsapp"
-      ? "confirmed"
-      : order.status === "confirmed"
-        ? "completed"
-        : null;
+    const next = nextOrderStatus[order.status];
     if (!next) return;
 
     setError(null);
     try {
       await updateOrderStatus(order.id, next);
       await refresh();
-      setNotice(next === "confirmed" ? "Porosia u konfirmua." : "Porosia u përfundua.");
+      setNotice(`Statusi u ndryshua në: ${orderStatusLabels[next]}.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Statusi i porosisë nuk u ndryshua.");
+    }
+  }
+
+  async function cancelOrder(order: OrderRecord) {
+    if (order.status === "delivered" || order.status === "cancelled") return;
+    if (!window.confirm(`Anulo porosinë ${order.reference}? Ky veprim nuk mund të zhbëhet.`)) return;
+    setError(null);
+    try {
+      await updateOrderStatus(order.id, "cancelled");
+      await refresh();
+      setNotice("Porosia u anulua.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Porosia nuk u anulua.");
     }
   }
 
@@ -738,13 +770,13 @@ export function AdminPage() {
               id: order.id,
               title: `${order.reference} · ${order.customer_name}`,
               meta: `${order.company_name || "Pa biznes"} · ${formatCurrency(order.total_cents)}`,
-              status: order.status,
-              actionLabel: order.status === "pending_whatsapp"
-                ? "Konfirmo"
-                : order.status === "confirmed"
-                  ? "Përfundo"
-                  : undefined,
-              onAction: () => advanceOrder(order)
+              status: orderStatusLabels[order.status],
+              actionLabel: orderActionLabels[order.status],
+              onAction: () => advanceOrder(order),
+              secondaryActionLabel: !["delivered", "cancelled"].includes(order.status)
+                ? "Anulo"
+                : undefined,
+              onSecondaryAction: () => cancelOrder(order)
             }))} />
           </div>
         </div>
@@ -775,6 +807,8 @@ function LeadTable({
     status: string;
     actionLabel?: string;
     onAction?: () => void;
+    secondaryActionLabel?: string;
+    onSecondaryAction?: () => void;
   }>;
 }) {
   return (
@@ -799,6 +833,11 @@ function LeadTable({
                     {row.actionLabel && row.onAction ? (
                       <Button size="sm" variant="outline" onClick={row.onAction}>
                         {row.actionLabel}
+                      </Button>
+                    ) : null}
+                    {row.secondaryActionLabel && row.onSecondaryAction ? (
+                      <Button size="sm" variant="destructive" onClick={row.onSecondaryAction}>
+                        {row.secondaryActionLabel}
                       </Button>
                     ) : null}
                   </div>

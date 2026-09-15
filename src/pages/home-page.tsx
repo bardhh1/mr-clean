@@ -1,4 +1,4 @@
-import { ArrowRight, Building2, CheckCircle2, MessageCircle, PackageCheck, Truck } from "lucide-react";
+import { ArrowRight, Building2, CheckCircle2, Mail, PackageCheck, Truck } from "lucide-react";
 import { Link } from "react-router-dom";
 import { PosterFrame, TrustItem } from "@/components/poster";
 import { ProductCard } from "@/components/product-card";
@@ -6,8 +6,8 @@ import { useCatalog } from "@/hooks/use-catalog";
 
 const orderSteps = [
   { number: "01", title: "Zgjidh artikujt", text: "Kërko në katalog, filtro sipas kategorisë dhe vendos sasinë që të duhet." },
-  { number: "02", title: "Plotëso porosinë", text: "Shto kontaktin, adresën dhe mënyrën e preferuar të pagesës." },
-  { number: "03", title: "Konfirmo në WhatsApp", text: "Ekipi ynë kontrollon stokun, transportin dhe kohën e dorëzimit." }
+  { number: "02", title: "Plotëso porosinë", text: "Shto kontaktin dhe adresën e dorëzimit." },
+  { number: "03", title: "Merr konfirmimin", text: "Porosia ruhet menjëherë dhe statusi ju dërgohet me email." }
 ];
 
 export function HomePage() {
@@ -34,7 +34,7 @@ export function HomePage() {
         <div className="home-trust" aria-label="Përfitimet e shërbimit">
           <TrustItem icon={Building2} title="Furnizim për HoReCa dhe zyra" text="Zgjidhje profesionale për çdo ambient." />
           <TrustItem icon={Truck} title="Çmimet të dukshme në EUR" text="Transparencë dhe kursim për biznesin tuaj." />
-          <TrustItem icon={MessageCircle} title="Porosi direkte në WhatsApp" text="Mbështetje e shpejtë dhe komunikim i drejtpërdrejtë." />
+          <TrustItem icon={Mail} title="Konfirmim me email" text="Njoftime të qarta për çdo hap të porosisë." />
         </div>
       </div>
 
@@ -106,7 +106,7 @@ export function HomePage() {
           <h2 id="final-cta-title">Gati kur është<br />biznesi juaj.</h2>
         </div>
         <div className="home-final-cta__action">
-          <p>Çmime të qarta, produkte profesionale dhe konfirmim direkt me ekipin tonë.</p>
+          <p>Çmime të qarta, produkte profesionale dhe njoftime me email për porosinë.</p>
           <Link to="/produkte" className="poster-cta">Hap katalogun <PackageCheck aria-hidden="true" /></Link>
         </div>
       </section>

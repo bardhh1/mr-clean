@@ -18,6 +18,7 @@
     "admin:create": "node dist/scripts/create-admin.js",
     "admin:mfa-bootstrap": "node dist/scripts/issue-admin-mfa-bootstrap.js",
     "admin:mfa-reset": "node dist/scripts/reset-admin-mfa.js",
+    "admin:replace": "node dist/scripts/replace-admin-owner.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

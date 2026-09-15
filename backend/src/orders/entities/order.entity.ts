@@ -10,14 +10,16 @@ import {
 import { OrderItemEntity } from "./order-item.entity";
 
 export const orderStatuses = [
-  "pending_whatsapp",
+  "pending",
   "confirmed",
-  "completed",
+  "processing",
+  "shipped",
+  "delivered",
   "cancelled"
 ] as const;
 
 export type OrderStatus = typeof orderStatuses[number];
-export type PaymentPreference = "cash" | "bank_transfer";
+export type PaymentPreference = "cash_on_delivery";
 
 const bigintNumber = {
   to: (value: number) => value,
@@ -49,6 +51,9 @@ export class OrderEntity {
   @Column({ type: "text" })
   phone!: string;
 
+  @Column({ type: "text", nullable: true })
+  customer_email!: string | null;
+
   @Column({ type: "text" })
   city!: string;
 
@@ -61,8 +66,14 @@ export class OrderEntity {
   @Column({ type: "text" })
   payment_preference!: PaymentPreference;
 
+  @Column({ type: "text", nullable: true })
+  legacy_payment_preference!: string | null;
+
+  @Column({ type: "smallint", default: 2 })
+  checkout_version!: number;
+
   @Index()
-  @Column({ type: "text", default: "pending_whatsapp" })
+  @Column({ type: "text", default: "pending" })
   status!: OrderStatus;
 
   @Column({ type: "bigint", transformer: bigintNumber })

@@ -7,7 +7,7 @@ export async function submitOrder(
   items: CartItem[]
 ): Promise<OrderReceipt> {
   const total = items.reduce((sum, item) => sum + item.product.price_cents * item.quantity, 0);
-  const attempt = orderAttempt(values, items);
+  const attempt = await orderAttempt(values, items);
 
   if (!hasApiConfig) {
     const reference = orderReference();
@@ -17,8 +17,7 @@ export async function submitOrder(
       reference,
       total_cents: total,
       currency: "EUR" as const,
-      status: "pending_whatsapp" as const,
-      ...values
+      status: "pending" as const
     };
   }
 
@@ -27,6 +26,7 @@ export async function submitOrder(
     body: {
       idempotency_key: attempt.key,
       ...values,
+      payment_preference: "cash_on_delivery",
       company_name: values.company_name || undefined,
       notes: values.notes || undefined,
       items: items.map((item) => ({
@@ -60,11 +60,26 @@ export async function updateOrderStatus(
 
 const orderAttemptStorageKey = "mr-clean-order-attempt:v1";
 
-function orderAttempt(values: CheckoutInput, items: CartItem[]) {
-  const signature = JSON.stringify({
-    values,
+async function orderAttempt(values: CheckoutInput, items: CartItem[]) {
+  const signaturePayload = JSON.stringify({
+    values: {
+      customer_name: values.customer_name,
+      company_name: values.company_name,
+      phone: values.phone,
+      customer_email: values.customer_email,
+      city: values.city,
+      address: values.address,
+      notes: values.notes
+    },
     items: items.map((item) => ({ id: item.product.id, quantity: item.quantity }))
   });
+  const signatureBytes = await window.crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(signaturePayload)
+  );
+  const signature = Array.from(new Uint8Array(signatureBytes), (byte) =>
+    byte.toString(16).padStart(2, "0")
+  ).join("");
   const saved = readOrderAttempt();
   if (saved?.signature === signature) return saved;
 

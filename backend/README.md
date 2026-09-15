@@ -53,6 +53,11 @@ For an owner migrated from Phase 08, issue the first bootstrap authorization wit
 require the current password, an explicit confirmation phrase, and a fresh bootstrap token.
 See the Phase 09 runbook before running any of these commands in production.
 
+To transfer the single-owner identity to a client, use `npm run admin:replace` with the
+explicit `ADMIN_REPLACE_FROM_EMAIL` and `ADMIN_REPLACE_CONFIRM` guard described in the Phase 11
+runbook. The transaction disables the former owner and invalidates all password/MFA sessions;
+never reuse `admin:create` to work around the single-owner constraint.
+
 ## Architecture record
 
 Every completed build phase has a detailed README under `docs/phases/`:
@@ -68,3 +73,5 @@ Every completed build phase has a detailed README under `docs/phases/`:
 9. Mandatory authenticator MFA, one-time recovery, and MFA-backed sessions.
 10. Same-origin browser/API boundary, strict Origin and CSRF enforcement, hardened headers,
     production Swagger shutdown, endpoint throttles, and an append-only audit ledger.
+11. Cash-on-delivery checkout, required customer email, expanded fulfillment lifecycle,
+    immutable financial snapshots, and durable customer/owner email notifications.

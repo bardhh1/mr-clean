@@ -2,13 +2,15 @@
 
 Production storefront and order platform for Mr. Clean, a Kosovo sanitary-supply business. Vercel serves the Vite/React frontend; Railway runs the NestJS API, PostgreSQL, and private product-image storage.
 
+The canonical production origin is `https://www.mrclean-ks.com`; `https://mrclean-ks.com` redirects to it. Railway CORS/origin validation and Cloudflare Turnstile hostname validation must use the canonical `www` hostname.
+
 ## Features
 
 - Albanian-first public storefront with EUR pricing.
 - Product catalog, category filters, search, detail pages and localStorage cart.
-- Transactional, idempotent checkout followed by a prefilled WhatsApp confirmation.
+- Transactional, idempotent cash-on-delivery checkout with email notifications.
 - Cookie-authenticated administration for catalog, images, and order fulfillment.
-- Server-authoritative EUR pricing and immutable order-item snapshots.
+- Server-authoritative EUR pricing, immutable order snapshots, and a durable email outbox.
 - Demo catalog fallback only when no API URL is configured.
 
 ## Setup

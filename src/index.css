@@ -286,12 +286,14 @@
 .payment-notes { display: grid; grid-template-columns: .95fr 1.05fr; gap: 22px; margin-top: 14px; padding-top: 15px; border-top: 1px solid var(--poster-blue); }
 .payment-notes fieldset { display: grid; gap: 8px; }
 .payment-notes legend { margin-bottom: 8px; }
+.payment-notes fieldset > p { min-height: 74px; padding: 14px; border: 1px solid var(--poster-blue); font-size: 13px; line-height: 1.5; }
 .payment-notes fieldset label { min-height: 52px; display: flex; align-items: center; gap: 12px; padding: 0 13px; border: 1px solid var(--poster-blue); font-size: 13px; font-weight: 650; }
 .payment-notes fieldset input { position: absolute; opacity: 0; pointer-events: none; }
 .payment-notes fieldset label > span { width: 19px; height: 19px; border: 1px solid var(--poster-blue); border-radius: 50%; }
 .payment-notes fieldset input:checked + span { box-shadow: inset 0 0 0 5px var(--poster-paper); background: var(--poster-blue); }
 .form-error { margin-top: 14px; color: hsl(var(--destructive)); font-size: 13px; font-weight: 700; }
 .checkout-summary { min-height: 100%; }
+.turnstile-widget { min-height: 65px; margin-bottom: 18px; overflow: hidden; }
 
 @keyframes pulse { 50% { opacity: .45; } }
 

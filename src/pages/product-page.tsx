@@ -108,7 +108,7 @@ export function ProductPage() {
         <div className="product-assurances">
           <TrustItem icon={ShieldCheck} title="Në stok" text="Gati për dërgesë të menjëhershme." />
           <TrustItem icon={PackageCheck} title="Çmimi në EUR" text="Transparencë dhe kursim për biznesin tuaj." />
-          <TrustItem icon={MessageCircle} title="Porosi e konfirmuar në WhatsApp" text="Mbështetje e drejtpërdrejtë." />
+          <TrustItem icon={MessageCircle} title="Mbështetje në WhatsApp" text="Komunikim i drejtpërdrejtë kur ju duhet ndihmë." />
         </div>
 
         {related.length > 0 ? (

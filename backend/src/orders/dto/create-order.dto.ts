@@ -5,6 +5,7 @@ import {
   ArrayMinSize,
   ArrayUnique,
   IsArray,
+  IsEmail,
   IsIn,
   IsOptional,
   IsString,
@@ -19,6 +20,11 @@ import { CreateOrderItemDto } from "./create-order-item.dto";
 export class CreateOrderDto {
   @IsUUID()
   idempotency_key!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2_048)
+  turnstile_token?: string;
 
   @IsString()
   @Transform(trimString)
@@ -36,6 +42,11 @@ export class CreateOrderDto {
   @Transform(trimString)
   @Matches(/^[+0-9][0-9 .()/-]{5,29}$/)
   phone!: string;
+
+  @IsEmail()
+  @Transform(trimString)
+  @MaxLength(254)
+  customer_email!: string;
 
   @IsString()
   @Transform(trimString)
@@ -55,8 +66,9 @@ export class CreateOrderDto {
   @MaxLength(1_000)
   notes?: string;
 
-  @IsIn(["cash", "bank_transfer"])
-  payment_preference!: "cash" | "bank_transfer";
+  @IsOptional()
+  @IsIn(["cash", "cash_on_delivery"])
+  payment_preference?: "cash" | "cash_on_delivery";
 
   @IsArray()
   @ArrayMinSize(1)

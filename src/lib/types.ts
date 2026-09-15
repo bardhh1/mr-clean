@@ -35,22 +35,35 @@ export type CheckoutInput = {
   customer_name: string;
   company_name?: string;
   phone: string;
+  customer_email: string;
   city: string;
   address: string;
   notes?: string;
-  payment_preference: "cash" | "bank_transfer";
+  turnstile_token?: string;
 };
+
+export type OrderStatus = "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled";
 
 export type OrderReceipt = {
   id: string;
   reference: string;
   total_cents: number;
   currency: "EUR";
-  status: "pending_whatsapp" | "confirmed" | "completed" | "cancelled";
+  status: OrderStatus;
   created_at?: string;
 };
 
-export type OrderRecord = CheckoutInput & OrderReceipt & {
+export type OrderRecord = OrderReceipt & {
+  customer_name: string;
+  company_name: string | null;
+  phone: string;
+  customer_email: string | null;
+  city: string;
+  address: string;
+  notes: string | null;
+  payment_preference: "cash_on_delivery";
+  legacy_payment_preference?: "cash" | "bank_transfer" | null;
+  checkout_version: 1 | 2;
   updated_at?: string;
   items?: Array<{
     id: string;

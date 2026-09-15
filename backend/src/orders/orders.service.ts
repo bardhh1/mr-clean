@@ -116,7 +116,9 @@ export class OrdersService {
           checkout_version: 2,
           status: "pending",
           total_cents: total,
-          currency: "EUR"
+          currency: "EUR",
+          delivered_at: null,
+          cancelled_at: null
         });
         const saved = await orderRepository.save(entity);
         saved.items = await itemRepository.save(lines.map((line) => itemRepository.create({
@@ -204,6 +206,8 @@ export class OrdersService {
 
       const previous = order.status;
       order.status = next;
+      if (next === "delivered") order.delivered_at = new Date();
+      if (next === "cancelled") order.cancelled_at = new Date();
       const saved = await repository.save(order);
       await this.audit.record({
         ...context,
@@ -315,6 +319,8 @@ function adminOrder(order: OrderEntity) {
     status: order.status,
     total_cents: order.total_cents,
     currency: order.currency,
+    delivered_at: order.delivered_at,
+    cancelled_at: order.cancelled_at,
     created_at: order.created_at,
     updated_at: order.updated_at,
     items: order.items?.map((item) => ({

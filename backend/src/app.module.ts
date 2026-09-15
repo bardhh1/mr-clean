@@ -15,6 +15,7 @@ import { HealthModule } from "./health/health.module";
 import { OrdersModule } from "./orders/orders.module";
 import { StorageModule } from "./storage/storage.module";
 import { AuditModule } from "./audit/audit.module";
+import { DashboardModule } from "./dashboard/dashboard.module";
 
 @Module({
   imports: [
@@ -39,7 +40,8 @@ import { AuditModule } from "./audit/audit.module";
     HealthModule,
     CatalogModule,
     AdminModule,
-    OrdersModule
+    OrdersModule,
+    DashboardModule
   ],
   providers: [
     { provide: APP_GUARD, useClass: RailwayThrottlerGuard },

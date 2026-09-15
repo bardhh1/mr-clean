@@ -34,6 +34,34 @@ type AdminProduct = {
   stock_label: string;
 };
 
+type CreatedOrderBody = {
+  id: string;
+  total_cents: number;
+};
+
+type DashboardSummaryBody = {
+  revenue_cents: number;
+  delivered_order_count: number;
+  average_order_value_cents: number;
+};
+
+type DashboardSalesBody = {
+  data: Array<{ bucket_start: string; order_count: number; revenue_cents: number }>;
+};
+
+type DashboardTopProductsBody = {
+  data: Array<{ product_id: string | null; units_sold: number }>;
+};
+
+type DashboardActivityBody = {
+  data: Array<{ action: string; target_id: string }>;
+};
+
+type AuditEventsBody = {
+  data: Array<{ id: string }>;
+  meta: { has_more: boolean; next_cursor: string | null };
+};
+
 describe("Single-owner authentication (e2e)", () => {
   let app: INestApplication;
   let server: Server;
@@ -77,6 +105,10 @@ describe("Single-owner authentication (e2e)", () => {
 
   it("rotates cookies, contains refresh replay, and revokes all sessions", async () => {
     const browser = request.agent(server);
+    await request(server)
+      .get("/api/v1/admin/dashboard/summary")
+      .set(trustedClient)
+      .expect(401);
     await request(server)
       .post("/api/v1/admin/auth/login")
       .set(trustedClient)
@@ -264,7 +296,8 @@ describe("Single-owner authentication (e2e)", () => {
         items: [{ product_id: product.id, quantity: 1 }]
       })
       .expect(201);
-    const createdOrderId = (createdOrder.body as { id: string }).id;
+    const createdOrderBody = createdOrder.body as CreatedOrderBody;
+    const createdOrderId = createdOrderBody.id;
     await browser
       .patch(`/api/v1/admin/orders/${createdOrderId}/status`)
       .set(trustedClient)
@@ -286,6 +319,81 @@ describe("Single-owner authentication (e2e)", () => {
       { event_type: "order.status.customer", status: "pending" },
       { event_type: "order.status.owner", status: "pending" }
     ]);
+
+    for (const status of ["processing", "shipped", "delivered"] as const) {
+      await browser
+        .patch(`/api/v1/admin/orders/${createdOrderId}/status`)
+        .set(trustedClient)
+        .set("Origin", browserOrigin)
+        .set("x-csrf-token", finalCsrfToken)
+        .send({ status })
+        .expect(200);
+    }
+
+    const reportingDate = businessDate();
+    const summary = await browser
+      .get(`/api/v1/admin/dashboard/summary?from=${reportingDate}&to=${reportingDate}`)
+      .set(trustedClient)
+      .expect("cache-control", "no-store")
+      .expect(200);
+    const summaryBody = summary.body as DashboardSummaryBody;
+    expect(summaryBody).toMatchObject({
+      revenue_cents: createdOrderBody.total_cents,
+      delivered_order_count: 1,
+      average_order_value_cents: createdOrderBody.total_cents,
+      period: { timezone: "Europe/Belgrade" }
+    });
+    expect(summaryBody).not.toHaveProperty("low_stock");
+
+    const sales = await browser
+      .get(`/api/v1/admin/dashboard/sales?from=${reportingDate}&to=${reportingDate}&interval=day`)
+      .set(trustedClient)
+      .expect(200);
+    const salesBody = sales.body as DashboardSalesBody;
+    expect(salesBody.data).toEqual([
+      expect.objectContaining({
+        bucket_start: reportingDate,
+        order_count: 1,
+        revenue_cents: createdOrderBody.total_cents
+      })
+    ]);
+
+    const topProducts = await browser
+      .get(`/api/v1/admin/dashboard/top-products?from=${reportingDate}&to=${reportingDate}`)
+      .set(trustedClient)
+      .expect(200);
+    const topProductsBody = topProducts.body as DashboardTopProductsBody;
+    expect(topProductsBody.data).toEqual(expect.arrayContaining([
+      expect.objectContaining({ product_id: product.id, units_sold: 1 })
+    ]));
+
+    const activity = await browser
+      .get("/api/v1/admin/dashboard/activity?limit=10")
+      .set(trustedClient)
+      .expect(200);
+    const activityBody = activity.body as DashboardActivityBody;
+    expect(activityBody.data).toEqual(expect.arrayContaining([
+      expect.objectContaining({ action: "orders.created", target_id: createdOrderId })
+    ]));
+    expect(JSON.stringify(activityBody)).not.toContain("buyer@example.com");
+
+    const auditPage = await browser
+      .get(`/api/v1/admin/audit-events?from=${reportingDate}&to=${reportingDate}&action=orders.status_updated&limit=2`)
+      .set(trustedClient)
+      .expect("cache-control", "no-store")
+      .expect(200);
+    const auditPageBody = auditPage.body as AuditEventsBody;
+    expect(auditPageBody.data).toHaveLength(2);
+    expect(auditPageBody.meta).toMatchObject({ has_more: true });
+    if (!auditPageBody.meta.next_cursor) throw new Error("Expected a second audit page");
+    await browser
+      .get(`/api/v1/admin/audit-events?cursor=${encodeURIComponent(auditPageBody.meta.next_cursor)}`)
+      .set(trustedClient)
+      .expect(200);
+    await browser
+      .get("/api/v1/admin/dashboard/summary?from=2026-02-30&to=2026-03-01")
+      .set(trustedClient)
+      .expect(400);
 
     await browser
       .post("/api/v1/admin/auth/logout-all")
@@ -350,4 +458,16 @@ function setCookieHeaders(header: unknown): string[] {
 
 function randomTestUuid(): string {
   return randomUUID();
+}
+
+function businessDate(): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Belgrade",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(new Date());
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+  return `${value("year")}-${value("month")}-${value("day")}`;
 }

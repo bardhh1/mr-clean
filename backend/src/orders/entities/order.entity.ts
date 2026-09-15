@@ -82,6 +82,12 @@ export class OrderEntity {
   @Column({ type: "char", length: 3, default: "EUR" })
   currency!: "EUR";
 
+  @Column({ type: "timestamptz", nullable: true })
+  delivered_at!: Date | null;
+
+  @Column({ type: "timestamptz", nullable: true })
+  cancelled_at!: Date | null;
+
   @CreateDateColumn({ type: "timestamptz" })
   created_at!: Date;
 

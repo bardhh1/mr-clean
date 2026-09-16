@@ -137,6 +137,8 @@ function existingOrder(status: OrderEntity["status"] = "pending"): OrderEntity {
     status,
     total_cents: 1_780,
     currency: "EUR",
+    delivered_at: status === "delivered" ? new Date("2026-08-22T12:00:00.000Z") : null,
+    cancelled_at: status === "cancelled" ? new Date("2026-08-22T12:00:00.000Z") : null,
     created_at: new Date("2026-08-22T10:00:00.000Z"),
     updated_at: new Date("2026-08-22T10:00:00.000Z"),
     items: []
@@ -286,5 +288,25 @@ describe("OrdersService", () => {
 
     await expect(administrativeService(null).service.updateStatus(order.id, "confirmed"))
       .rejects.toMatchObject({ status: 404 });
+  });
+
+  it("sets an immutable business timestamp when entering a terminal state", async () => {
+    const delivered = existingOrder("shipped");
+    const deliveredTest = administrativeService(delivered);
+    await deliveredTest.service.updateStatus(delivered.id, "delivered");
+    const savedDelivered = (
+      deliveredTest.transactionRepository.save.mock.calls[0]?.[0]
+    ) as unknown as OrderEntity | undefined;
+    expect(savedDelivered?.delivered_at).toBeInstanceOf(Date);
+    expect(savedDelivered?.cancelled_at).toBeNull();
+
+    const cancelled = existingOrder("processing");
+    const cancelledTest = administrativeService(cancelled);
+    await cancelledTest.service.updateStatus(cancelled.id, "cancelled");
+    const savedCancelled = (
+      cancelledTest.transactionRepository.save.mock.calls[0]?.[0]
+    ) as unknown as OrderEntity | undefined;
+    expect(savedCancelled?.delivered_at).toBeNull();
+    expect(savedCancelled?.cancelled_at).toBeInstanceOf(Date);
   });
 });

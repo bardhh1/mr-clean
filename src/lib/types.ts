@@ -65,6 +65,8 @@ export type OrderRecord = OrderReceipt & {
   legacy_payment_preference?: "cash" | "bank_transfer" | null;
   checkout_version: 1 | 2;
   updated_at?: string;
+  delivered_at: string | null;
+  cancelled_at: string | null;
   items?: Array<{
     id: string;
     product_id: string | null;

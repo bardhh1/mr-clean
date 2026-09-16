@@ -45,6 +45,18 @@ export async function signOutAdmin(): Promise<void> {
   invalidateAdminSessionRefresh();
 }
 
+export async function signOutAllAdmin(): Promise<void> {
+  await apiRequest<void>("/admin/auth/logout-all", {
+    method: "POST",
+    retryAuth: false
+  });
+  invalidateAdminSessionRefresh();
+}
+
+export async function getAdminSessions(): Promise<AdminSession[]> {
+  return apiRequest<AdminSession[]>("/admin/auth/sessions");
+}
+
 export async function getSessionUser(): Promise<AdminUser | null> {
   try {
     const response = await apiRequest<{ user: AdminUser }>("/admin/auth/me");
@@ -133,6 +145,16 @@ export type AdminUser = {
   id: string;
   email: string;
   role: "admin";
+};
+
+export type AdminSession = {
+  id: string;
+  current: boolean;
+  created_at: string;
+  last_used_at: string;
+  expires_at: string;
+  family_expires_at: string;
+  mfa_verified_at: string;
 };
 
 export type MfaChallenge = {
